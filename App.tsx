@@ -1,8 +1,8 @@
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import GlobeVisualizer from './components/GlobeVisualizer';
 import TerminalOverlay from './components/TerminalOverlay';
-import { sendCommandToKernel } from './services/geminiService';
+import { sendCommandToKernel, listAvailableModels, checkOllamaStatus, OllamaModel } from './services/ollamaService';
 import { INITIAL_SYSTEM_PROMPT, ROOT_DIRECTORIES } from './constants';
 import { loadInitialProjectFiles } from './utils/fileLoader';
 import { SystemMessage, VirtualFile, FileType, DirectoryState } from './types';
@@ -34,12 +34,17 @@ const App: React.FC = () => {
     [allFiles, currentDirectory.id]
   );
 
+  // --- Ollama Model State ---
+  const [availableModels, setAvailableModels] = useState<OllamaModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [isOllamaOnline, setIsOllamaOnline] = useState(false);
+
   // --- Messages & Processing ---
   const [messages, setMessages] = useState<SystemMessage[]>([
-    { id: '0', role: 'system', content: 'Gemini 3 VDB Kernel Initialized...', timestamp: Date.now() },
+    { id: '0', role: 'system', content: 'Ollama VDB Kernel Initializing...', timestamp: Date.now() },
     { id: '1', role: 'ai', content: 'VDB Online. Persistent file system active.', timestamp: Date.now() + 100 }
   ]);
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedNode, setSelectedNode] = useState<VirtualFile | null>(null);
   
@@ -50,6 +55,46 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
+  // --- Load Ollama Models on Mount ---
+  useEffect(() => {
+    const loadModels = async () => {
+      const status = await checkOllamaStatus();
+      setIsOllamaOnline(status);
+
+      if (status) {
+        const models = await listAvailableModels();
+        setAvailableModels(models);
+
+        if (models.length > 0) {
+          // Set first model as default
+          setSelectedModel(models[0].name);
+          setMessages(prev => [...prev, {
+            id: generateId(),
+            role: 'system',
+            content: `>> CONNECTED: Ollama detected. ${models.length} model(s) available. Default: ${models[0].name}`,
+            timestamp: Date.now()
+          }]);
+        } else {
+          setMessages(prev => [...prev, {
+            id: generateId(),
+            role: 'system',
+            content: '!! WARNING: Ollama is running but no models found. Run "ollama pull <model>" to download a model.',
+            timestamp: Date.now()
+          }]);
+        }
+      } else {
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'system',
+          content: '!! ERROR: Cannot connect to Ollama. Please ensure Ollama is running (ollama serve).',
+          timestamp: Date.now()
+        }]);
+      }
+    };
+
+    loadModels();
+  }, []);
+
   // --- AI Interaction ---
 
   const handleSendMessage = useCallback(async (text: string) => {
@@ -59,7 +104,7 @@ const App: React.FC = () => {
 
     // Give AI context of current directory only
     const contextFiles = visibleFiles.map(f => `[${f.type}] ${f.name}: ${(f.content || "").substring(0, 50)}...`);
-    const result = await sendCommandToKernel(text, contextFiles);
+    const result = await sendCommandToKernel(text, contextFiles, selectedModel);
 
     const aiMsg: SystemMessage = { id: generateId(), role: 'ai', content: result.message, timestamp: Date.now() };
     setMessages(prev => [...prev, aiMsg]);
@@ -99,7 +144,7 @@ const App: React.FC = () => {
     }
 
     setIsProcessing(false);
-  }, [currentDirectory.id, visibleFiles]);
+  }, [currentDirectory.id, visibleFiles, selectedModel]);
 
   // --- Node Interaction ---
 
@@ -582,11 +627,11 @@ const App: React.FC = () => {
       />
       
       {/* UI Overlay Layer */}
-      <TerminalOverlay 
-        messages={messages} 
-        onSendMessage={handleSendMessage} 
-        visibleFiles={visibleFiles} 
-        allFiles={allFiles} 
+      <TerminalOverlay
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        visibleFiles={visibleFiles}
+        allFiles={allFiles}
         isProcessing={isProcessing}
         directoryStack={directoryStack}
         onBreadcrumbClick={handleBreadcrumbClick}
@@ -597,6 +642,10 @@ const App: React.FC = () => {
         onInjectFolder={handleInjectFolderTrigger}
         onJumpToFile={handleJumpToFile}
         onSyncRepo={handleSyncRepo}
+        availableModels={availableModels}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        isOllamaOnline={isOllamaOnline}
       />
 
       {/* Drag Overlay Indicator */}

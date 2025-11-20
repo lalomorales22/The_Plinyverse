@@ -3,7 +3,7 @@
 ## Overview
 **PLINYVERSE** is a conceptual 3D Visualization Database (VDB) Operating System running in the browser. It utilizes a reactive 3D Neural Globe Matrix to visualize data nodes, folders, and media files as interconnected entities in a void.
 
-Powered by **Google's Gemini 2.5 Flash**, the system acts as an intelligent kernel (`PLINY-KERNEL`), capable of understanding natural language to navigate, create, and manipulate the persistent virtual file system.
+Powered by **Ollama** (local AI inference), the system acts as an intelligent kernel (`PLINY-KERNEL`), capable of understanding natural language to navigate, create, and manipulate the persistent virtual file system. Users can select from any locally installed Ollama model.
 
 ## Progress & Features
 
@@ -33,7 +33,18 @@ The system boots with two primary root clusters:
 2.  **L1B3RT4S**: Contains creative works, free-form data, and expansions.
 
 ## Setup & Usage
-1.  **API Key**: The app requires a Google GenAI API Key to power the Terminal's natural language processing.
-2.  **Exploration**: Use the mouse to rotate the globe. Click nodes to inspect. Click "Neural Dive" to enter folders.
-3.  **Creation**: Use the Console to ask the AI to create folders (e.g., "Create a directory for my python scripts").
-4.  **Importing**: Drag files onto the screen to populate your Plinyverse.
+
+### Prerequisites
+1.  **Install Ollama**: Download and install Ollama from [https://ollama.com](https://ollama.com)
+2.  **Pull a Model**: Run `ollama pull llama2` (or any other model like `mistral`, `codellama`, `phi`, etc.)
+3.  **Start Ollama**: Run `ollama serve` to start the local Ollama server (default: http://localhost:11434)
+
+### Usage
+1.  **Start the App**: Run `npm install` and `npm run dev`
+2.  **Model Selection**: The app will automatically detect available Ollama models. Select your preferred model from the dropdown in the terminal interface.
+3.  **Exploration**: Use the mouse to rotate the globe. Click nodes to inspect. Click "Neural Dive" to enter folders.
+4.  **Creation**: Use the Console to ask the AI to create folders (e.g., "Create a directory for my python scripts").
+5.  **Importing**: Drag files onto the screen to populate your Plinyverse.
+
+### Configuration
+- **Custom Ollama URL**: Set the `OLLAMA_BASE_URL` environment variable if Ollama is running on a different host/port (default: http://localhost:11434)
