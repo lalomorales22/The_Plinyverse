@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle, Cpu } from 'lucide-react';
+import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle, Cpu, Trash2 } from 'lucide-react';
 import { SystemMessage, VirtualFile, FileType, DirectoryState } from '../types';
 import { ROOT_CLARITAS_ID, ROOT_LIBERTAS_ID } from '../constants';
 import { OllamaModel } from '../services/ollamaService';
@@ -20,6 +20,7 @@ interface TerminalOverlayProps {
   onInjectFolder: () => void;
   onJumpToFile: (file: VirtualFile) => void;
   onSyncRepo: (url: string) => void;
+  onDeleteFile: (fileId: string) => void;
   availableModels: OllamaModel[];
   selectedModel: string;
   onModelChange: (model: string) => void;
@@ -41,6 +42,7 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
     onInjectFolder,
     onJumpToFile,
     onSyncRepo,
+    onDeleteFile,
     availableModels,
     selectedModel,
     onModelChange,
@@ -76,15 +78,23 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
   const handleSyncClick = () => {
       if (!repoUrl) return;
       setIsSyncing(true);
-      
+
       // Trigger sync in App (async)
       onSyncRepo(repoUrl);
-      
+
       // UI loading state reset after a timeout or could be controlled by props
       // For now we just reset button state after 2s to allow re-click
       setTimeout(() => {
           setIsSyncing(false);
       }, 2000);
+  }
+
+  const handleDeleteFile = () => {
+      if (!selectedNode) return;
+      if (confirm(`Are you sure you want to delete "${selectedNode.name}"? This action cannot be undone.`)) {
+          onDeleteFile(selectedNode.id);
+          onCloseModal();
+      }
   }
 
   // Drag Logic
@@ -389,6 +399,13 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                           <ImageIcon size={18} />
                           {selectedNode.name}
                       </h2>
+                      <button
+                          onClick={handleDeleteFile}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
+                      >
+                          <Trash2 size={14} />
+                          Delete
+                      </button>
                   </div>
                   <div className="flex-1 bg-black/50 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden p-2">
                       <img src={selectedNode.content} alt={selectedNode.name} className="max-w-full max-h-[60vh] object-contain rounded" />
@@ -405,6 +422,13 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                         <VideoIcon size={18} />
                         {selectedNode.name}
                     </h2>
+                    <button
+                        onClick={handleDeleteFile}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
+                    >
+                        <Trash2 size={14} />
+                        Delete
+                    </button>
                 </div>
                 <div className="flex-1 bg-black/50 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden p-2">
                     <video controls src={selectedNode.content} className="max-w-full max-h-[60vh] rounded" />
@@ -421,6 +445,13 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                         <FileText size={18} />
                         {selectedNode.name}
                     </h2>
+                    <button
+                        onClick={handleDeleteFile}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
+                    >
+                        <Trash2 size={14} />
+                        Delete
+                    </button>
                 </div>
                 <div className="flex-1 bg-white/5 border border-white/10 rounded-lg overflow-hidden">
                     <iframe src={selectedNode.content} className="w-full h-[60vh]" title="PDF Viewer"></iframe>
@@ -433,20 +464,29 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
           return (
               <div className="flex flex-col h-full">
                   <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-bold text-blue-400 flex items-center gap-2">
-                          <FileText size={18} />
-                          {selectedNode.name}
-                      </h2>
-                      <div className="text-xs text-gray-500 font-mono">{selectedNode.content.length} chars</div>
+                      <div className="flex items-center gap-3">
+                          <h2 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                              <FileText size={18} />
+                              {selectedNode.name}
+                          </h2>
+                          <div className="text-xs text-gray-500 font-mono">{selectedNode.content.length} chars</div>
+                      </div>
+                      <button
+                          onClick={handleDeleteFile}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
+                      >
+                          <Trash2 size={14} />
+                          Delete
+                      </button>
                   </div>
                   <div className="flex-1 bg-gray-900/80 border border-white/10 rounded-lg overflow-hidden flex flex-col">
                        <div className="bg-white/5 px-3 py-1 border-b border-white/5 text-[10px] text-gray-400 font-mono flex gap-4">
                            <span>UTF-8</span>
                            <span>READ-ONLY</span>
                        </div>
-                       <textarea 
-                          readOnly 
-                          value={selectedNode.content} 
+                       <textarea
+                          readOnly
+                          value={selectedNode.content}
                           className="w-full h-[50vh] bg-transparent text-green-50 font-mono text-xs p-4 outline-none resize-none"
                        />
                   </div>
@@ -501,9 +541,9 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
           <div className="px-3 py-2 border-b border-white/10 bg-white/5 flex items-center space-x-1 overflow-x-auto scrollbar-hide">
                 <Database size={12} className="text-gray-500 flex-shrink-0" />
                 {directoryStack.map((dir, idx) => (
-                    <React.Fragment key={dir.id}>
+                    <React.Fragment key={`breadcrumb-${idx}-${dir.id}`}>
                         {idx > 0 && <ChevronRight size={10} className="text-gray-600 flex-shrink-0" />}
-                        <button 
+                        <button
                             onClick={() => onBreadcrumbClick(idx)}
                             className={`text-[10px] font-mono tracking-wider uppercase whitespace-nowrap transition ${idx === directoryStack.length -1 ? 'text-green-400 font-bold cursor-default' : 'text-gray-400 hover:text-white cursor-pointer'}`}
                         >
@@ -557,15 +597,15 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
 
       {/* Modal Viewer (Context Aware) */}
       {selectedNode && (
-          <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-8" onClick={onCloseModal}>
-              <div className="w-full max-w-4xl h-[80vh] bg-gray-900 border border-white/10 rounded-2xl shadow-2xl flex flex-col relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                  <button 
-                      onClick={onCloseModal} 
-                      className="absolute top-4 right-4 text-gray-400 hover:text-white transition z-10 bg-black/50 rounded-full p-2"
+          <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-8 animate-fadeIn" onClick={onCloseModal}>
+              <div className="w-full max-w-4xl h-[80vh] bg-black/85 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.5)] flex flex-col relative overflow-hidden animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+                  <button
+                      onClick={onCloseModal}
+                      className="absolute top-4 right-4 text-gray-400 hover:text-white transition z-10 bg-black/50 rounded-full p-2 hover:bg-black/70"
                   >
                       <X size={20} />
                   </button>
-                  
+
                   <div className="flex-1 p-6 overflow-auto">
                       {renderModalContent()}
                   </div>

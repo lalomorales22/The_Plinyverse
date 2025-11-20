@@ -387,10 +387,27 @@ const App: React.FC = () => {
   // --- Breadcrumbs ---
 
   const handleBreadcrumbClick = (index: number) => {
-      if (index === directoryStack.length - 1) return; 
+      if (index === directoryStack.length - 1) return;
       const newStack = directoryStack.slice(0, index + 1);
       setDirectoryStack(newStack);
   };
+
+  // --- Delete File ---
+  const handleDeleteFile = useCallback((fileId: string) => {
+      // Remove file from the database
+      setAllFiles(prev => prev.filter(f => f.id !== fileId));
+
+      // Add system message
+      const deletedFile = allFiles.find(f => f.id === fileId);
+      if (deletedFile) {
+          setMessages(prev => [...prev, {
+              id: generateId(),
+              role: 'system',
+              content: `>> DELETED: "${deletedFile.name}" removed from VDB.`,
+              timestamp: Date.now()
+          }]);
+      }
+  }, [allFiles]);
 
 
   // --- Drag & Drop / File Processing ---
@@ -642,6 +659,7 @@ const App: React.FC = () => {
         onInjectFolder={handleInjectFolderTrigger}
         onJumpToFile={handleJumpToFile}
         onSyncRepo={handleSyncRepo}
+        onDeleteFile={handleDeleteFile}
         availableModels={availableModels}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
