@@ -1,61 +1,109 @@
 import { VirtualFile, FileType } from '../types';
 import { ROOT_CLARITAS_ID, ROOT_LIBERTAS_ID } from '../constants';
-import { v4 as uuidv4 } from 'uuid';
 
-// NOTE: In this specific runtime environment, `import.meta.glob` is not supported.
-// We are manually defining the content of the files to prevent the crash.
-// In a local Vite environment, you could uncomment the glob logic.
+// Use Vite's glob import to load all files from the project folders
+const claritasFiles = import.meta.glob('../CL4R1T4S/**/*', { query: '?raw', import: 'default', eager: true });
+const libertasFiles = import.meta.glob('../L1B3RT4S/*', { query: '?raw', import: 'default', eager: true });
 
-const MANIFESTO_CONTENT = `
-# CL4R1T4S MANIFESTO
+const generateId = () => Math.random().toString(36).substring(2, 15);
 
-We seek truth in data.
-Structure is the foundation of knowledge.
+// Determine file type based on extension
+const getFileType = (filename: string): FileType => {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
 
-1. Organize.
-2. Visualize.
-3. Understand.
+    if (['js', 'ts', 'tsx', 'jsx', 'py', 'java', 'cpp', 'c', 'go', 'rs'].includes(ext)) {
+        return FileType.CODE;
+    }
+    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) {
+        return FileType.IMAGE;
+    }
+    if (['mp4', 'avi', 'mov', 'webm'].includes(ext)) {
+        return FileType.VIDEO;
+    }
+    if (ext === 'pdf') {
+        return FileType.PDF;
+    }
+    if (['txt', 'md', 'mkd', 'json'].includes(ext)) {
+        return FileType.TEXT;
+    }
 
-Data added to this folder in the project root will automatically appear in the CL4R1T4S node.
-`;
-
-const WELCOME_CONTENT = `
-# Infinite Possibilities
-
-Welcome to the **L1B3RT4S** node.
-
-This sector is dedicated to:
-- Creative Expansion
-- Unstructured Data
-- Experimental Code
-
-> "The void is not empty; it is full of potential."
-
-Add .txt, .md, or .mkd files to the L1B3RT4S folder in your project to populate this space.
-`;
+    return FileType.TEXT; // default
+};
 
 export const loadInitialProjectFiles = (): VirtualFile[] => {
-    // Manually register the files since we cannot scan the directory at runtime here
-    const files: VirtualFile[] = [
-        {
-            id: `auto_manifesto`,
-            parentId: ROOT_CLARITAS_ID,
-            name: '00_MANIFESTO.txt',
-            type: FileType.TEXT,
-            content: MANIFESTO_CONTENT.trim(),
-            createdAt: Date.now()
-        },
-        {
-            id: `auto_welcome`,
-            parentId: ROOT_LIBERTAS_ID,
-            name: '00_WELCOME.md',
-            type: FileType.TEXT, // MD is treated as text/doc
-            content: WELCOME_CONTENT.trim(),
-            createdAt: Date.now()
-        }
-    ];
+    const files: VirtualFile[] = [];
+    const processedDirs = new Set<string>();
 
-    console.log(`[PLINYVERSE] Loaded ${files.length} project files manually.`);
+    // Process CL4R1T4S files (with subdirectories)
+    Object.entries(claritasFiles).forEach(([path, content]) => {
+        // Parse path: ../CL4R1T4S/FOLDER/file.txt
+        const relativePath = path.replace('../CL4R1T4S/', '');
+        const parts = relativePath.split('/');
+
+        if (parts.length === 1) {
+            // Root level file in CL4R1T4S (like README.md, LICENSE)
+            const filename = parts[0];
+            if (!filename) return;
+
+            files.push({
+                id: `claritas_${generateId()}`,
+                parentId: ROOT_CLARITAS_ID,
+                name: filename,
+                type: getFileType(filename),
+                content: content as string,
+                createdAt: Date.now()
+            });
+        } else if (parts.length === 2) {
+            // Subdirectory file: FOLDER/file.txt
+            const folderName = parts[0];
+            const filename = parts[1];
+            if (!filename) return;
+
+            const folderId = `claritas_dir_${folderName}`;
+
+            // Create directory entry if not exists
+            if (!processedDirs.has(folderId)) {
+                processedDirs.add(folderId);
+                files.push({
+                    id: folderId,
+                    parentId: ROOT_CLARITAS_ID,
+                    name: folderName,
+                    type: FileType.DIRECTORY,
+                    content: `${folderName} Documentation`,
+                    createdAt: Date.now()
+                });
+            }
+
+            // Add file to directory
+            files.push({
+                id: `claritas_${generateId()}`,
+                parentId: folderId,
+                name: filename,
+                type: getFileType(filename),
+                content: content as string,
+                createdAt: Date.now()
+            });
+        }
+    });
+
+    // Process L1B3RT4S files (flat structure)
+    Object.entries(libertasFiles).forEach(([path, content]) => {
+        // Parse path: ../L1B3RT4S/file.txt
+        const filename = path.replace('../L1B3RT4S/', '');
+        if (!filename) return;
+
+        files.push({
+            id: `libertas_${generateId()}`,
+            parentId: ROOT_LIBERTAS_ID,
+            name: filename,
+            type: getFileType(filename),
+            content: content as string,
+            createdAt: Date.now()
+        });
+    });
+
+    console.log(`[PLINYVERSE] Loaded ${files.length} files from project folders.`);
+    console.log(`[PLINYVERSE] CL4R1T4S directories: ${processedDirs.size}`);
 
     return files;
 };
