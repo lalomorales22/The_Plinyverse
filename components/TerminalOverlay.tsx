@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle } from 'lucide-react';
+import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle, Cpu } from 'lucide-react';
 import { SystemMessage, VirtualFile, FileType, DirectoryState } from '../types';
 import { ROOT_CLARITAS_ID, ROOT_LIBERTAS_ID } from '../constants';
+import { OllamaModel } from '../services/ollamaService';
 
 interface TerminalOverlayProps {
   messages: SystemMessage[];
@@ -19,11 +20,15 @@ interface TerminalOverlayProps {
   onInjectFolder: () => void;
   onJumpToFile: (file: VirtualFile) => void;
   onSyncRepo: (url: string) => void;
+  availableModels: OllamaModel[];
+  selectedModel: string;
+  onModelChange: (model: string) => void;
+  isOllamaOnline: boolean;
 }
 
-const TerminalOverlay: React.FC<TerminalOverlayProps> = ({ 
-    messages, 
-    onSendMessage, 
+const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
+    messages,
+    onSendMessage,
     visibleFiles,
     allFiles,
     isProcessing,
@@ -35,12 +40,16 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
     onInjectData,
     onInjectFolder,
     onJumpToFile,
-    onSyncRepo
+    onSyncRepo,
+    availableModels,
+    selectedModel,
+    onModelChange,
+    isOllamaOnline
 }) => {
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState<'terminal' | 'import' | 'claritas' | 'libertas' | 'sync'>('terminal');
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [repoUrl, setRepoUrl] = useState('github.com/google/gemini-api-cookbook'); // Example default
+  const [repoUrl, setRepoUrl] = useState('github.com/ollama/ollama'); // Example default
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Draggable State
@@ -155,6 +164,31 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                             </div>
                         )}
                     </div>
+
+                    {/* Model Selector */}
+                    <div className="px-3 py-2 bg-black/60 border-t border-white/10 flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <Cpu size={12} className={isOllamaOnline ? "text-cyan-400" : "text-red-400"} />
+                            <span className="text-[10px] text-gray-400 uppercase font-mono">Model:</span>
+                        </div>
+                        <select
+                            value={selectedModel}
+                            onChange={(e) => onModelChange(e.target.value)}
+                            disabled={!isOllamaOnline || availableModels.length === 0}
+                            className="bg-black/50 border border-white/20 rounded px-2 py-1 text-xs font-mono text-cyan-100 outline-none focus:border-cyan-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {availableModels.length === 0 ? (
+                                <option value="">No models available</option>
+                            ) : (
+                                availableModels.map(model => (
+                                    <option key={model.name} value={model.name}>
+                                        {model.name}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
                     <div className="p-3 bg-black/40 border-t border-white/10 flex items-center space-x-2">
                         <span className="text-green-500 animate-pulse">{'>'}</span>
                         <input
