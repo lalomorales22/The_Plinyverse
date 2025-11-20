@@ -533,19 +533,19 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                 >
                     <GitBranch size={12} />
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('claritas')}
                     className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'claritas' ? 'bg-white/10 text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
                 >
                     <Shield size={12} className="mr-1.5" />
-                    CL4R
+                    CL4R1T4S
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('libertas')}
                     className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'libertas' ? 'bg-white/10 text-purple-400 border-b-2 border-purple-400' : 'text-gray-500'}`}
                 >
                     <Zap size={12} className="mr-1.5" />
-                    L1B3
+                    L1B3RT4S
                 </button>
           </div>
 
