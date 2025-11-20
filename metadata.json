@@ -1,0 +1,7 @@
+{
+  "name": "PLINYVERSE",
+  "description": "A 3D persistent data visualization operating system. It visualizes data in a global dot matrix and acts as an intelligent agent for file and content generation.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
