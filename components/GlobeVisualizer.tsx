@@ -308,7 +308,7 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 <meshStandardMaterial
                     color={color}
                     emissive={color}
-                    emissiveIntensity={hovered ? 2.5 : 0.8}
+                    emissiveIntensity={hovered ? 3.0 : 1.8}
                     roughness={0.1}
                     metalness={0.6}
                 />
@@ -316,19 +316,17 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 {/* Glow Halo - PERFORMANCE FIX: Removed point light, using only emissive */}
                 <mesh ref={haloRef} scale={[1.4, 1.4, 1.4]}>
                     <sphereGeometry args={[0.25, 16, 16]} />
-                    <meshBasicMaterial color={color} transparent opacity={hovered ? 0.2 : 0.1} depthWrite={false} />
+                    <meshBasicMaterial color={color} transparent opacity={hovered ? 0.3 : 0.2} depthWrite={false} />
                 </mesh>
 
-                {/* PERFORMANCE FIX: Using canvas-based sprite label instead of HTML overlay */}
-                {hovered && (
-                    <SpriteLabel
-                        text={file.name}
-                        position={[0, 0.5, 0]}
-                        color="#ffffff"
-                        backgroundColor="rgba(0, 0, 0, 0.8)"
-                        fontSize={20}
-                    />
-                )}
+                {/* Node name label - Always visible for better node identification */}
+                <SpriteLabel
+                    text={file.name}
+                    position={[0, 0.5, 0]}
+                    color={hovered ? "#ffffff" : "#aaaaaa"}
+                    backgroundColor={hovered ? "rgba(0, 0, 0, 0.8)" : "rgba(0, 0, 0, 0.6)"}
+                    fontSize={hovered ? 20 : 16}
+                />
             </mesh>
         </group>
     )
