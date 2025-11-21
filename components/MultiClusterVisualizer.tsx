@@ -115,6 +115,7 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
     const [hovered, setHovered] = useState(false);
     const [particleCount, setParticleCount] = useState(isActive ? 400 : 200);
     const { camera } = useThree();
+    const frameCountRef = useRef(0);
 
     const clusterFiles = files.filter(f =>
         (f.clusterId || 'root') === cluster.id &&
@@ -122,6 +123,10 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
     );
 
     useFrame(() => {
+        // Debounce particle count updates to every 10 frames to prevent rapid WebGL buffer changes
+        frameCountRef.current++;
+        if (frameCountRef.current % 10 !== 0) return;
+
         if (groupRef.current) {
             const distance = camera.position.distanceTo(groupRef.current.position);
             let newCount;
@@ -134,6 +139,7 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
                 else if (distance < 30) newCount = 100;
                 else newCount = 50;
             }
+            // Only update if the change is significant to prevent unnecessary re-renders
             if (Math.abs(particleCount - newCount) > 30) {
                 setParticleCount(newCount);
             }
@@ -158,7 +164,10 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
     }, []);
 
     const activePositions = useMemo(() => {
-        return new Float32Array(positions.buffer, 0, particleCount * 3);
+        // Ensure we don't exceed the buffer size
+        const maxParticles = 400;
+        const safeCount = Math.min(particleCount, maxParticles);
+        return new Float32Array(positions.buffer, 0, safeCount * 3);
     }, [positions, particleCount]);
 
     return (
@@ -187,7 +196,7 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
                     <bufferGeometry>
                         <bufferAttribute
                             attach="attributes-position"
-                            count={particleCount}
+                            count={Math.min(particleCount, 400)}
                             array={activePositions}
                             itemSize={3}
                         />
@@ -359,11 +368,15 @@ const DiveController = ({
     const { camera, controls } = useThree();
     const prevFilesRef = useRef(files);
     const prevDivingIdRef = useRef(divingNodeId);
+    const isResettingRef = useRef(false);
 
     const currentCluster = clusters.find(c => c.id === currentClusterId);
     const clusterOffset = currentCluster ? currentCluster.position : [0, 0, 0];
 
     useFrame(() => {
+        // Skip frame updates if we're in the middle of a reset to prevent conflicts
+        if (isResettingRef.current) return;
+
         if (divingNodeId) {
             const clusterFiles = files.filter(f =>
                 (f.clusterId || 'root') === currentClusterId &&
@@ -380,10 +393,11 @@ const DiveController = ({
                 );
                 const distance = camera.position.distanceTo(targetPos);
                 if (distance > 0.8) {
-                    camera.position.lerp(targetPos, 0.1);
+                    // Smoother interpolation for better animation
+                    camera.position.lerp(targetPos, 0.08);
                     if (controls) {
                         const orbitControls = controls as any;
-                        orbitControls.target.lerp(targetPos, 0.1);
+                        orbitControls.target.lerp(targetPos, 0.08);
                         orbitControls.update();
                     }
                 } else {
@@ -397,25 +411,43 @@ const DiveController = ({
 
     useEffect(() => {
         if (files !== prevFilesRef.current && currentCluster) {
-            camera.position.set(clusterOffset[0], clusterOffset[1], clusterOffset[2] + 22);
-            if (controls) {
-                const orbitControls = controls as any;
-                orbitControls.target.set(clusterOffset[0], clusterOffset[1], clusterOffset[2]);
-                orbitControls.update();
-            }
+            isResettingRef.current = true;
+            // Smooth camera reset with animation
+            const resetCamera = () => {
+                const targetPos = new THREE.Vector3(clusterOffset[0], clusterOffset[1], clusterOffset[2] + 22);
+                camera.position.copy(targetPos);
+                if (controls) {
+                    const orbitControls = controls as any;
+                    orbitControls.target.set(clusterOffset[0], clusterOffset[1], clusterOffset[2]);
+                    orbitControls.update();
+                }
+                // Allow frame updates again after a short delay
+                setTimeout(() => {
+                    isResettingRef.current = false;
+                }, 100);
+            };
+            resetCamera();
             prevFilesRef.current = files;
         }
     }, [files, camera, controls, clusterOffset, currentCluster]);
 
     useEffect(() => {
-        if (prevDivingIdRef.current && !divingNodeId) {
-            if (camera.position.length() < 5 && currentCluster) {
+        if (prevDivingIdRef.current && !divingNodeId && currentCluster) {
+            const distanceFromCluster = camera.position.distanceTo(
+                new THREE.Vector3(clusterOffset[0], clusterOffset[1], clusterOffset[2])
+            );
+            // Only reset if camera is very close to prevent conflicts with zoom out
+            if (distanceFromCluster < 5) {
+                isResettingRef.current = true;
                 camera.position.set(clusterOffset[0], clusterOffset[1], clusterOffset[2] + 22);
                 if (controls) {
                     const orbitControls = controls as any;
                     orbitControls.target.set(clusterOffset[0], clusterOffset[1], clusterOffset[2]);
                     orbitControls.update();
                 }
+                setTimeout(() => {
+                    isResettingRef.current = false;
+                }, 100);
             }
         }
         prevDivingIdRef.current = divingNodeId;
@@ -437,18 +469,34 @@ const ZoomListener = ({
     clusters: Cluster[]
 }) => {
     const { camera } = useThree();
-    const ZOOM_OUT_THRESHOLD = 60;
+    const ZOOM_OUT_THRESHOLD = 65;
     const currentCluster = clusters.find(c => c.id === currentClusterId);
     const clusterPos = useMemo(() => {
         return currentCluster ? new THREE.Vector3(...currentCluster.position) : new THREE.Vector3(0, 0, 0);
     }, [currentCluster]);
 
+    const frameCountRef = useRef(0);
+    const hasTriggeredRef = useRef(false);
+
     useFrame(() => {
-        if (canNavigateUp) {
-            const dist = camera.position.distanceTo(clusterPos);
-            if (dist > ZOOM_OUT_THRESHOLD) {
-                onNavigateUp();
-            }
+        if (!canNavigateUp) {
+            hasTriggeredRef.current = false;
+            return;
+        }
+
+        // Check every 5 frames for performance and to prevent rapid triggering
+        frameCountRef.current++;
+        if (frameCountRef.current % 5 !== 0) return;
+
+        const dist = camera.position.distanceTo(clusterPos);
+
+        // Only trigger once per zoom-out session to prevent repeated calls
+        if (dist > ZOOM_OUT_THRESHOLD && !hasTriggeredRef.current) {
+            hasTriggeredRef.current = true;
+            onNavigateUp();
+        } else if (dist <= ZOOM_OUT_THRESHOLD) {
+            // Reset flag when camera comes back within threshold
+            hasTriggeredRef.current = false;
         }
     });
 
@@ -536,10 +584,10 @@ const MultiClusterVisualizer: React.FC<MultiClusterVisualizerProps> = ({
                     enablePan={true}
                     enableZoom={true}
                     minDistance={0.5}
-                    maxDistance={100}
+                    maxDistance={70}
                     autoRotate={false}
                     enableDamping={true}
-                    dampingFactor={0.05}
+                    dampingFactor={0.08}
                 />
             </Canvas>
             
