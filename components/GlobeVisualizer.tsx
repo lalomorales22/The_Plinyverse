@@ -38,42 +38,43 @@ const calculateNodePosition = (index: number, total: number, radius: number = 4.
 };
 
 // Handles the "Zoom In" animation when diving
-const DiveController = ({ 
-    divingNodeId, 
-    files, 
-    onDiveComplete 
-}: { 
-    divingNodeId: string | null, 
-    files: VirtualFile[], 
-    onDiveComplete: () => void 
+const DiveController = ({
+    divingNodeId,
+    files,
+    onDiveComplete
+}: {
+    divingNodeId: string | null,
+    files: VirtualFile[],
+    onDiveComplete: () => void
 }) => {
     const { camera, controls } = useThree();
     // We need to reset the camera when the file list changes (meaning we arrived at the new folder)
     const prevFilesRef = useRef(files);
     const prevDivingIdRef = useRef(divingNodeId);
+    const isResettingRef = useRef(false);
 
     useFrame((state, delta) => {
+        // Skip frame updates if we're in the middle of a reset to prevent conflicts
+        if (isResettingRef.current) return;
+
         // 1. Handle Diving Animation
         if (divingNodeId) {
             const targetIndex = files.findIndex(f => f.id === divingNodeId);
             if (targetIndex !== -1) {
                 const [tx, ty, tz] = calculateNodePosition(targetIndex, files.length);
                 const targetPos = new THREE.Vector3(tx, ty, tz);
-                
+
                 // Move camera towards target
                 // We want to get very close, effectively "inside" it
                 const distance = camera.position.distanceTo(targetPos);
-                
+
                 if (distance > 0.8) {
-                    // Interpolate position
-                    camera.position.lerp(targetPos, 0.1);
-                    // Make camera look at the node
-                    const currentLookAt = new THREE.Vector3();
-                    camera.getWorldDirection(currentLookAt);
-                    
+                    // Smoother interpolation for better animation
+                    camera.position.lerp(targetPos, 0.08);
+
                     if (controls) {
                          const orbitControls = controls as any;
-                         orbitControls.target.lerp(targetPos, 0.1);
+                         orbitControls.target.lerp(targetPos, 0.08);
                          orbitControls.update();
                     }
                 } else {
@@ -90,15 +91,21 @@ const DiveController = ({
     // 2. Handle "New Level" Reset (When files actually change)
     useEffect(() => {
         if (files !== prevFilesRef.current) {
-            // We have loaded a new directory.
-            // Reset camera to a nice viewing distance
-            camera.position.set(0, 0, 22);
-            if (controls) {
-                const orbitControls = controls as any;
-                orbitControls.target.set(0, 0, 0);
-                orbitControls.update();
-            }
-            
+            isResettingRef.current = true;
+            // Smooth camera reset with animation
+            const resetCamera = () => {
+                camera.position.set(0, 0, 22);
+                if (controls) {
+                    const orbitControls = controls as any;
+                    orbitControls.target.set(0, 0, 0);
+                    orbitControls.update();
+                }
+                // Allow frame updates again after a short delay
+                setTimeout(() => {
+                    isResettingRef.current = false;
+                }, 100);
+            };
+            resetCamera();
             prevFilesRef.current = files;
         }
     }, [files, camera, controls]);
@@ -110,12 +117,16 @@ const DiveController = ({
             // If the file list hasn't changed yet, or we are stuck close to a node, reset.
             // We check if the camera is dangerously close to the center or a node
             if (camera.position.length() < 5) {
-                 camera.position.set(0, 0, 22);
-                 if (controls) {
+                isResettingRef.current = true;
+                camera.position.set(0, 0, 22);
+                if (controls) {
                     const orbitControls = controls as any;
                     orbitControls.target.set(0, 0, 0);
                     orbitControls.update();
-                 }
+                }
+                setTimeout(() => {
+                    isResettingRef.current = false;
+                }, 100);
             }
         }
         prevDivingIdRef.current = divingNodeId;
@@ -125,23 +136,38 @@ const DiveController = ({
 };
 
 // Monitors camera distance to trigger "Back/Up" navigation on zoom out
-const ZoomListener = ({ 
-    canNavigateUp, 
-    onNavigateUp 
-}: { 
-    canNavigateUp: boolean, 
-    onNavigateUp: () => void 
+const ZoomListener = ({
+    canNavigateUp,
+    onNavigateUp
+}: {
+    canNavigateUp: boolean,
+    onNavigateUp: () => void
 }) => {
     const { camera } = useThree();
     // Threshold to trigger the "Zoom Out" navigation
-    const ZOOM_OUT_THRESHOLD = 45;
+    const ZOOM_OUT_THRESHOLD = 50;
+    const frameCountRef = useRef(0);
+    const hasTriggeredRef = useRef(false);
 
     useFrame(() => {
-        if (canNavigateUp) {
-            const dist = camera.position.distanceTo(new THREE.Vector3(0,0,0));
-            if (dist > ZOOM_OUT_THRESHOLD) {
-                onNavigateUp();
-            }
+        if (!canNavigateUp) {
+            hasTriggeredRef.current = false;
+            return;
+        }
+
+        // Check every 5 frames for performance and to prevent rapid triggering
+        frameCountRef.current++;
+        if (frameCountRef.current % 5 !== 0) return;
+
+        const dist = camera.position.distanceTo(new THREE.Vector3(0,0,0));
+
+        // Only trigger once per zoom-out session to prevent repeated calls
+        if (dist > ZOOM_OUT_THRESHOLD && !hasTriggeredRef.current) {
+            hasTriggeredRef.current = true;
+            onNavigateUp();
+        } else if (dist <= ZOOM_OUT_THRESHOLD) {
+            // Reset flag when camera comes back within threshold
+            hasTriggeredRef.current = false;
         }
     });
 
@@ -152,9 +178,14 @@ const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: Virt
   const groupRef = useRef<THREE.Group>(null!);
   const [particleCount, setParticleCount] = useState(600);
   const { camera } = useThree();
+  const frameCountRef = useRef(0);
 
   // PERFORMANCE FIX: LOD system - Adjust particle count based on camera distance
   useFrame(() => {
+    // Debounce particle count updates to every 10 frames to prevent rapid WebGL buffer changes
+    frameCountRef.current++;
+    if (frameCountRef.current % 10 !== 0) return;
+
     if (groupRef.current) {
       const distance = camera.position.distanceTo(groupRef.current.position);
 
@@ -199,7 +230,10 @@ const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: Virt
 
   // Use only the number of particles needed for current LOD
   const activePositions = useMemo(() => {
-    return new Float32Array(positions.buffer, 0, particleCount * 3);
+    // Ensure we don't exceed the buffer size
+    const maxParticles = 600;
+    const safeCount = Math.min(particleCount, maxParticles);
+    return new Float32Array(positions.buffer, 0, safeCount * 3);
   }, [positions, particleCount]);
 
   return (
@@ -209,7 +243,7 @@ const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: Virt
           <bufferGeometry>
             <bufferAttribute
               attach="attributes-position"
-              count={particleCount}
+              count={Math.min(particleCount, 600)}
               array={activePositions}
               itemSize={3}
             />
@@ -391,16 +425,16 @@ const GlobeVisualizer: React.FC<GlobeVisualizerProps> = ({
 
         <ParticleSphere files={files} onNodeClick={onNodeClick} onNodeContextMenu={onNodeContextMenu} />
         
-        <OrbitControls 
+        <OrbitControls
             makeDefault
             enabled={!divingNodeId} // Disable controls while auto-diving to prevent conflicts
-            enablePan={false} 
-            enableZoom={true} 
-            minDistance={0.5} 
-            maxDistance={60} 
-            autoRotate={false} 
+            enablePan={false}
+            enableZoom={true}
+            minDistance={0.5}
+            maxDistance={55}
+            autoRotate={false}
             enableDamping={true}
-            dampingFactor={0.05}
+            dampingFactor={0.08}
         />
       </Canvas>
     </div>
