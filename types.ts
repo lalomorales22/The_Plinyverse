@@ -18,6 +18,15 @@ export interface VirtualFile {
   content: string;
   createdAt: number;
   coordinates?: [number, number, number]; // 3D position
+  clusterId?: string; // Which cluster this file belongs to
+}
+
+export interface Cluster {
+  id: string;
+  name: string;
+  position: [number, number, number]; // Position in the multi-cluster canvas
+  color: string; // Visual color for the cluster
+  createdAt: number;
 }
 
 export interface SystemMessage {

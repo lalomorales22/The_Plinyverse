@@ -1,41 +1,55 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import GlobeVisualizer from './components/GlobeVisualizer';
+import MultiClusterVisualizer from './components/MultiClusterVisualizer';
 import TerminalOverlay from './components/TerminalOverlay';
 import { sendCommandToKernel, listAvailableModels, checkOllamaStatus, OllamaModel } from './services/ollamaService';
 import { INITIAL_SYSTEM_PROMPT, ROOT_DIRECTORIES } from './constants';
 import { loadInitialProjectFiles } from './utils/fileLoader';
-import { SystemMessage, VirtualFile, FileType, DirectoryState } from './types';
+import { SystemMessage, VirtualFile, FileType, DirectoryState, Cluster } from './types';
 import { dbService } from './services/dbService';
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+// SECURITY FIX: Use crypto.randomUUID() instead of Math.random() for secure, collision-resistant IDs
+const generateId = () => crypto.randomUUID();
 
 const App: React.FC = () => {
   // --- Persistent File System State ---
   // Initialize with Root Directories + Dynamically Loaded Project Files
   const [allFiles, setAllFiles] = useState<VirtualFile[]>([]);
 
-  // Load files from DB on mount
+  // NEW: Cluster Management
+  const [allClusters, setAllClusters] = useState<Cluster[]>([]);
+  const [currentClusterId, setCurrentClusterId] = useState<string>('root');
+
+  // Load files and clusters from DB on mount
   useEffect(() => {
-      const initFiles = async () => {
+      const initData = async () => {
+          // Load clusters first
+          const dbClusters = await dbService.getAllClusters();
+          setAllClusters(dbClusters);
+
+          // Load files
           const dbFiles = await dbService.getAllFiles();
-          
+
           if (dbFiles.length === 0) {
               // First run: Load initial files and save to DB
               const rootDirs = ROOT_DIRECTORIES.map(f => ({
-                  ...f, 
-                  type: f.type as FileType, 
-                  parentId: f.parentId || 'root' 
+                  ...f,
+                  type: f.type as FileType,
+                  parentId: f.parentId || 'root',
+                  clusterId: 'root' // Assign to root cluster
               }));
-              const projectFiles = loadInitialProjectFiles();
+              const projectFiles = loadInitialProjectFiles().map(f => ({
+                  ...f,
+                  clusterId: 'root'
+              }));
               const initialFiles = [...rootDirs, ...projectFiles];
-              
+
               await dbService.saveFilesBatch(initialFiles);
               setAllFiles(initialFiles);
           } else {
               setAllFiles(dbFiles);
           }
       };
-      initFiles();
+      initData();
   }, []);
 
   // --- Navigation State (History Stack) ---
@@ -43,11 +57,11 @@ const App: React.FC = () => {
     { id: 'root', name: 'ROOT' }
   ]);
 
-  // Derived State: Current Folder and Visible Files
+  // Derived State: Current Folder and Visible Files (filtered by current cluster)
   const currentDirectory = directoryStack[directoryStack.length - 1];
-  const visibleFiles = useMemo(() => 
-    allFiles.filter(f => f.parentId === currentDirectory.id),
-    [allFiles, currentDirectory.id]
+  const visibleFiles = useMemo(() =>
+    allFiles.filter(f => f.parentId === currentDirectory.id && (f.clusterId || 'root') === currentClusterId),
+    [allFiles, currentDirectory.id, currentClusterId]
   );
 
   // --- Ollama Model State ---
@@ -170,13 +184,14 @@ const App: React.FC = () => {
             name: op.file.name,
             type: op.file.type as FileType,
             content: op.file.content || "",
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            clusterId: currentClusterId // Assign to current cluster
           };
           newFiles.push(newFile);
           setMessages(prev => [...prev, { id: generateId(), role: 'system', content: `>> CREATED: ${newFile.name}`, timestamp: Date.now() }]);
         }
       });
-      
+
       if (newFiles.length > 0) {
           await dbService.saveFilesBatch(newFiles);
           setAllFiles(prev => [...prev, ...newFiles]);
@@ -190,7 +205,8 @@ const App: React.FC = () => {
             name: node.name,
             type: FileType.DATA_NODE,
             content: node.description || "",
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            clusterId: currentClusterId // Assign to current cluster
         }));
         await dbService.saveFilesBatch(newNodes);
         setAllFiles(prev => [...prev, ...newNodes]);
@@ -346,7 +362,8 @@ const App: React.FC = () => {
               name: repo,
               type: FileType.DIRECTORY,
               content: `Cloned from ${url}`,
-              createdAt: Date.now()
+              createdAt: Date.now(),
+              clusterId: currentClusterId // Assign to current cluster
           }];
           
           const pathMap: {[key: string]: string} = { "": repoDirId }; // path -> nodeId
@@ -367,14 +384,15 @@ const App: React.FC = () => {
              pathMap[node.path] = nodeId;
              const parentId = getParentId(node.path);
              const name = node.path.split('/').pop() || node.path;
-             
+
              newFiles.push({
                  id: nodeId,
                  parentId: parentId,
                  name: name,
                  type: FileType.DIRECTORY,
                  content: "Directory",
-                 createdAt: Date.now()
+                 createdAt: Date.now(),
+                 clusterId: currentClusterId // Assign to current cluster
              });
           });
 
@@ -420,7 +438,8 @@ const App: React.FC = () => {
                  name: name,
                  type: type,
                  content: content,
-                 createdAt: Date.now()
+                 createdAt: Date.now(),
+                 clusterId: currentClusterId // Assign to current cluster
              });
           };
 
@@ -455,14 +474,14 @@ const App: React.FC = () => {
   const simulateClone = (url: string) => {
       const repoName = url.split('/').pop() || 'repo';
       const repoId = generateId();
-      
+
       const simFiles: VirtualFile[] = [
-          { id: repoId, parentId: currentDirectory.id, name: repoName, type: FileType.DIRECTORY, content: "Git Repository", createdAt: Date.now() },
-          { id: generateId(), parentId: repoId, name: 'src', type: FileType.DIRECTORY, content: "Source Code", createdAt: Date.now() },
-          { id: generateId(), parentId: repoId, name: 'README.md', type: FileType.TEXT, content: `# ${repoName}\n\nCloned to Plinyverse VDB.`, createdAt: Date.now() },
-          { id: generateId(), parentId: repoId, name: 'package.json', type: FileType.CODE, content: `{\n  "name": "${repoName}"\n}`, createdAt: Date.now() },
+          { id: repoId, parentId: currentDirectory.id, name: repoName, type: FileType.DIRECTORY, content: "Git Repository", createdAt: Date.now(), clusterId: currentClusterId },
+          { id: generateId(), parentId: repoId, name: 'src', type: FileType.DIRECTORY, content: "Source Code", createdAt: Date.now(), clusterId: currentClusterId },
+          { id: generateId(), parentId: repoId, name: 'README.md', type: FileType.TEXT, content: `# ${repoName}\n\nCloned to Plinyverse VDB.`, createdAt: Date.now(), clusterId: currentClusterId },
+          { id: generateId(), parentId: repoId, name: 'package.json', type: FileType.CODE, content: `{\n  "name": "${repoName}"\n}`, createdAt: Date.now(), clusterId: currentClusterId },
       ];
-      
+
       setAllFiles(prev => [...prev, ...simFiles]);
       setMessages(prev => [...prev, { id: generateId(), role: 'system', content: `>> SIMULATION COMPLETE: Generated structure for ${repoName}.`, timestamp: Date.now() }]);
   };
@@ -548,6 +567,52 @@ const App: React.FC = () => {
       }
   }, [allFiles]);
 
+  // --- Cluster Management ---
+  const handleCreateCluster = useCallback(async (name: string) => {
+      // Generate random position for new cluster (spread them out)
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 15 + Math.random() * 10;
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+
+      // Random color from predefined palette
+      const colors = ['#00ff9d', '#3b82f6', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981'];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+
+      const newCluster: Cluster = {
+          id: generateId(),
+          name: name,
+          position: [x, 0, z],
+          color: color,
+          createdAt: Date.now()
+      };
+
+      await dbService.saveCluster(newCluster);
+      setAllClusters(prev => [...prev, newCluster]);
+
+      setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'system',
+          content: `>> CLUSTER CREATED: "${name}" initialized at position [${x.toFixed(1)}, 0, ${z.toFixed(1)}].`,
+          timestamp: Date.now()
+      }]);
+  }, []);
+
+  const handleClusterClick = useCallback((clusterId: string) => {
+      setCurrentClusterId(clusterId);
+      setDirectoryStack([{ id: 'root', name: 'ROOT' }]); // Reset to root of new cluster
+
+      const cluster = allClusters.find(c => c.id === clusterId);
+      if (cluster) {
+          setMessages(prev => [...prev, {
+              id: generateId(),
+              role: 'system',
+              content: `>> CLUSTER SWITCH: Navigating to "${cluster.name}".`,
+              timestamp: Date.now()
+          }]);
+      }
+  }, [allClusters]);
+
 
   // --- Drag & Drop / File Processing ---
 
@@ -574,11 +639,11 @@ const App: React.FC = () => {
 
   // Standard flat file processing
   const processFiles = async (fileList: File[], targetId: string) => {
-      setMessages(prev => [...prev, { 
-          id: generateId(), 
-          role: 'system', 
-          content: `>> INGESTING: Adding ${fileList.length} entities...`, 
-          timestamp: Date.now() 
+      setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'system',
+          content: `>> INGESTING: Adding ${fileList.length} entities...`,
+          timestamp: Date.now()
       }]);
 
       const newVirtualFiles: VirtualFile[] = [];
@@ -586,14 +651,15 @@ const App: React.FC = () => {
           const { content, type } = await readFileContent(file);
           newVirtualFiles.push({
               id: generateId(),
-              parentId: targetId, 
+              parentId: targetId,
               name: file.name,
               type: type,
               content: content,
-              createdAt: Date.now()
+              createdAt: Date.now(),
+              clusterId: currentClusterId // Assign to current cluster
           });
       }
-      
+
       await dbService.saveFilesBatch(newVirtualFiles);
       setAllFiles(prev => [...prev, ...newVirtualFiles]);
   };
@@ -637,7 +703,8 @@ const App: React.FC = () => {
                   name: currentFolderName,
                   type: FileType.DIRECTORY,
                   content: "Imported Directory",
-                  createdAt: Date.now()
+                  createdAt: Date.now(),
+                  clusterId: currentClusterId // Assign to current cluster
               });
               return getFolderId(pathParts.slice(1), newFolderId);
           }
@@ -650,14 +717,14 @@ const App: React.FC = () => {
               await processFiles([file], rootTargetId);
               continue;
           }
-          
+
           const parts = path.split('/');
           const fileName = parts.pop()!;
           const folderParts = parts; // content before file
-          
+
           // Recursively ensure folders exist
           const finalParentId = getFolderId(folderParts, rootTargetId);
-          
+
           const { content, type } = await readFileContent(file);
           newFiles.push({
               id: generateId(),
@@ -665,7 +732,8 @@ const App: React.FC = () => {
               name: fileName,
               type: type,
               content: content,
-              createdAt: Date.now()
+              createdAt: Date.now(),
+              clusterId: currentClusterId // Assign to current cluster
           });
       }
       
@@ -689,7 +757,8 @@ const App: React.FC = () => {
                 name: file.name,
                 type: type,
                 content: content,
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                clusterId: currentClusterId // Assign to current cluster
             });
         } else if (item.isDirectory) {
             // Create directory node
@@ -700,7 +769,8 @@ const App: React.FC = () => {
                 name: item.name,
                 type: FileType.DIRECTORY,
                 content: "Dropped Directory",
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                clusterId: currentClusterId // Assign to current cluster
             });
             
             // Read entries
@@ -776,9 +846,12 @@ const App: React.FC = () => {
         onChange={handleFolderInputChange}
       />
 
-      {/* 3D Background Layer */}
-      <GlobeVisualizer 
-        files={visibleFiles} 
+      {/* 3D Background Layer - Multi-Cluster Visualization */}
+      <MultiClusterVisualizer
+        clusters={allClusters}
+        currentClusterId={currentClusterId}
+        files={allFiles}
+        onClusterClick={handleClusterClick}
         onNodeClick={handleNodeClick}
         onNodeContextMenu={handleNodeContextMenu}
         divingNodeId={divingNodeId}
@@ -855,6 +928,8 @@ const App: React.FC = () => {
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
         isOllamaOnline={isOllamaOnline}
+        onCreateCluster={handleCreateCluster}
+        clusterCount={allClusters.length}
       />
 
       {/* Drag Overlay Indicator */}
