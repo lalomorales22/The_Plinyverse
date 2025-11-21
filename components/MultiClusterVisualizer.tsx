@@ -290,6 +290,7 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
 
     return (
         <group>
+            {/* Outer glow layers - visual only, not clickable */}
             <mesh scale={[1.6, 1.6, 1.6]}>
                 <sphereGeometry args={[0.25, 16, 16]} />
                 <meshBasicMaterial color={color} transparent opacity={0.25} depthWrite={false} />
@@ -298,6 +299,7 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 <sphereGeometry args={[0.25, 16, 16]} />
                 <meshBasicMaterial color={color} transparent opacity={hovered ? 0.45 : 0.35} depthWrite={false} />
             </mesh>
+            {/* Core mesh - ONLY this is clickable with reduced radius */}
             <mesh
                 ref={meshRef}
                 position={[0,0,0]}
@@ -306,8 +308,9 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 onPointerOver={() => setHovered(true)}
                 onPointerOut={() => setHovered(false)}
             >
-                <sphereGeometry args={[0.25, 24, 24]} />
+                <sphereGeometry args={[0.2, 24, 24]} />
                 <meshStandardMaterial color={color} emissive={color} emissiveIntensity={hovered ? 3.0 : 1.5} roughness={0.1} metalness={0.6} />
+                {/* Inner halo - non-interactive */}
                 <mesh ref={haloRef} scale={[1.2, 1.2, 1.2]}>
                     <sphereGeometry args={[0.25, 16, 16]} />
                     <meshBasicMaterial color={color} transparent opacity={hovered ? 0.4 : 0.3} depthWrite={false} />
@@ -414,7 +417,7 @@ const DiveController = ({
             isResettingRef.current = true;
             // Smooth camera reset with animation
             const resetCamera = () => {
-                const targetPos = new THREE.Vector3(clusterOffset[0], clusterOffset[1], clusterOffset[2] + 22);
+                const targetPos = new THREE.Vector3(clusterOffset[0], clusterOffset[1], clusterOffset[2] + 40);
                 camera.position.copy(targetPos);
                 if (controls) {
                     const orbitControls = controls as any;
@@ -439,7 +442,7 @@ const DiveController = ({
             // Only reset if camera is very close to prevent conflicts with zoom out
             if (distanceFromCluster < 5) {
                 isResettingRef.current = true;
-                camera.position.set(clusterOffset[0], clusterOffset[1], clusterOffset[2] + 22);
+                camera.position.set(clusterOffset[0], clusterOffset[1], clusterOffset[2] + 40);
                 if (controls) {
                     const orbitControls = controls as any;
                     orbitControls.target.set(clusterOffset[0], clusterOffset[1], clusterOffset[2]);
@@ -537,7 +540,7 @@ const MultiClusterVisualizer: React.FC<MultiClusterVisualizerProps> = ({
 
     return (
         <div className="w-full h-full absolute inset-0 z-0 bg-gradient-to-b from-black via-gray-900 to-black">
-            <Canvas camera={{ position: [0, 0, 22], fov: 60 }} dpr={[1, 2]} performance={{ min: 0.5 }}>
+            <Canvas camera={{ position: [0, 0, 40], fov: 60 }} dpr={[1, 2]} performance={{ min: 0.5 }}>
                 <color attach="background" args={['#050505']} />
                 <ambientLight intensity={0.5} />
                 <pointLight position={[10, 10, 10]} intensity={1} color="#00ff9d" />

@@ -94,7 +94,7 @@ const DiveController = ({
             isResettingRef.current = true;
             // Smooth camera reset with animation
             const resetCamera = () => {
-                camera.position.set(0, 0, 22);
+                camera.position.set(0, 0, 40);
                 if (controls) {
                     const orbitControls = controls as any;
                     orbitControls.target.set(0, 0, 0);
@@ -118,7 +118,7 @@ const DiveController = ({
             // We check if the camera is dangerously close to the center or a node
             if (camera.position.length() < 5) {
                 isResettingRef.current = true;
-                camera.position.set(0, 0, 22);
+                camera.position.set(0, 0, 40);
                 if (controls) {
                     const orbitControls = controls as any;
                     orbitControls.target.set(0, 0, 0);
@@ -329,6 +329,7 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
 
     return (
         <group>
+            {/* Core mesh - ONLY this is clickable with reduced radius */}
             <mesh
                 ref={meshRef}
                 position={[0,0,0]} // Start at center for explosion effect
@@ -338,7 +339,7 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 onPointerOut={() => setHovered(false)}
             >
                 {/* PERFORMANCE FIX: Fixed geometry size, use scale for hover */}
-                <sphereGeometry args={[0.25, 24, 24]} />
+                <sphereGeometry args={[0.2, 24, 24]} />
                 <meshStandardMaterial
                     color={color}
                     emissive={color}
@@ -347,7 +348,7 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                     metalness={0.6}
                 />
 
-                {/* Glow Halo - PERFORMANCE FIX: Removed point light, using only emissive */}
+                {/* Glow Halo - PERFORMANCE FIX: Removed point light, using only emissive - non-interactive */}
                 <mesh ref={haloRef} scale={[1.4, 1.4, 1.4]}>
                     <sphereGeometry args={[0.25, 16, 16]} />
                     <meshBasicMaterial color={color} transparent opacity={hovered ? 0.3 : 0.2} depthWrite={false} />
@@ -404,7 +405,7 @@ const GlobeVisualizer: React.FC<GlobeVisualizerProps> = ({
 }) => {
   return (
     <div className="w-full h-full absolute inset-0 z-0 bg-gradient-to-b from-black via-gray-900 to-black">
-      <Canvas camera={{ position: [0, 0, 22], fov: 60 }} dpr={[1, 2]} performance={{ min: 0.5 }}>
+      <Canvas camera={{ position: [0, 0, 40], fov: 60 }} dpr={[1, 2]} performance={{ min: 0.5 }}>
         <color attach="background" args={['#050505']} />
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={1} color="#00ff9d" />

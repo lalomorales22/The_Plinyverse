@@ -509,7 +509,13 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                     </div>
                 </div>
                 <div className="flex-1 bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-                    <embed src={selectedNode.content} type="application/pdf" className="w-full h-full" />
+                    {/* SECURITY FIX: Sanitize URL to prevent XSS attacks */}
+                    <iframe
+                        src={sanitizeUrl(selectedNode.content)}
+                        type="application/pdf"
+                        className="w-full h-full border-0"
+                        title={`PDF Viewer - ${selectedNode.name}`}
+                    />
                 </div>
             </div>
         )
