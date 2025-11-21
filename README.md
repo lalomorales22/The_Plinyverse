@@ -1,6 +1,6 @@
 # PLINYVERSE
 
-**Repository:** [lalomorales22/plinyverse](https://github.com/lalomorales22/plinyverse)
+**Repository:** [lalomorales22/the_plinyverse](https://github.com/lalomorales22/the_plinyverse)
 
 ## Overview
 **PLINYVERSE** is a futuristic, 3D Visualization Database (VDB) Operating System that runs in your browser. It reimagines file management and data exploration by transforming your file system into a reactive **3D Neural Globe Matrix**. Instead of navigating boring lists and icons, you explore data nodes, folders, and media as interconnected, glowing entities floating in a digital void.
@@ -43,14 +43,14 @@ The Plinyverse is designed for:
 1.  **Node.js**: Ensure you have Node.js installed (v18+ recommended).
 2.  **Ollama (Optional but Recommended)**:
     *   Download from [ollama.com](https://ollama.com).
-    *   Pull a model: `ollama pull llama3` (or your preferred model).
+    *   Pull a model: `ollama run gemma3:1b` (or your preferred model).
     *   Start the server: `ollama serve`.
 
 ### Installation & Run
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/lalomorales22/plinyverse.git
-    cd plinyverse
+    git clone https://github.com/lalomorales22/The_Plinyverse.git
+    cd the_plinyverse
     ```
 2.  Install dependencies:
     ```bash
@@ -68,4 +68,5 @@ The system boots with two primary root clusters:
 *   **L1B3RT4S**: Represents creative works, free-form data, and expansions.
 
 ---
-*Built with React, Three.js, Express, SQLite, and Ollama.*
+*Built with Gemini 3 Pro, Claude Code, React, Three.js, Express, SQLite, Ollama, and friendship*
+*Happy Turkey Day Pliny!*
