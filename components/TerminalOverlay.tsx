@@ -25,6 +25,8 @@ interface TerminalOverlayProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   isOllamaOnline: boolean;
+  onCreateCluster: (name: string) => void; // NEW: Create cluster callback
+  clusterCount: number; // NEW: Display cluster count
 }
 
 const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
@@ -46,7 +48,9 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
     availableModels,
     selectedModel,
     onModelChange,
-    isOllamaOnline
+    isOllamaOnline,
+    onCreateCluster,
+    clusterCount
 }) => {
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState<'terminal' | 'import' | 'claritas' | 'libertas' | 'sync'>('terminal');
@@ -54,6 +58,10 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
   const [repoUrl, setRepoUrl] = useState('github.com/ollama/ollama'); // Example default
   const [isSyncing, setIsSyncing] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // NEW: Cluster creation modal
+  const [showClusterModal, setShowClusterModal] = useState(false);
+  const [newClusterName, setNewClusterName] = useState('');
 
   // Draggable State
   const [position, setPosition] = useState({ x: 20, y: 20 });
@@ -96,6 +104,13 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
           onDeleteFile(selectedNode.id);
           onCloseModal();
       }
+  }
+
+  const handleCreateCluster = () => {
+      if (!newClusterName.trim()) return;
+      onCreateCluster(newClusterName);
+      setNewClusterName('');
+      setShowClusterModal(false);
   }
 
   // Drag Logic
@@ -510,11 +525,21 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
             <>
                 {/* VDB Stats Row */}
                 <div className="px-4 py-2 border-b border-white/10 bg-black/20 flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-green-400">
+                    <div className="flex items-center space-x-3 text-green-400">
                             <HardDrive size={12} />
                             <span className="font-bold font-mono text-[10px]">VDB STORAGE</span>
+                            {/* NEW: + NODE button for creating clusters */}
+                            <button
+                                onClick={() => setShowClusterModal(true)}
+                                className="ml-2 px-2 py-0.5 bg-green-600/20 hover:bg-green-600/40 border border-green-500/50 rounded text-[10px] font-mono transition flex items-center gap-1"
+                                title="Create new cluster"
+                            >
+                                <Layers size={10} />
+                                + NODE
+                            </button>
                         </div>
                         <div className="flex space-x-3 text-[10px] font-mono text-gray-400">
+                            <span>Clusters: {clusterCount}</span>
                             <span>Nodes: {allFiles.length}</span>
                             <span>Depth: {directoryStack.length}</span>
                         </div>
@@ -593,6 +618,57 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
 
                   <div className="flex-1 p-6 overflow-auto">
                       {renderModalContent()}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* NEW: Cluster Creation Modal */}
+      {showClusterModal && (
+          <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-8 animate-fadeIn" onClick={() => setShowClusterModal(false)}>
+              <div className="w-full max-w-md bg-black/90 backdrop-blur-xl border border-green-500/30 rounded-2xl shadow-[0_0_40px_rgba(34,197,94,0.3)] p-6 animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-bold text-green-400 flex items-center gap-2">
+                          <Layers size={20} />
+                          CREATE NEW CLUSTER
+                      </h2>
+                      <button
+                          onClick={() => setShowClusterModal(false)}
+                          className="text-gray-400 hover:text-white transition"
+                      >
+                          <X size={20} />
+                      </button>
+                  </div>
+
+                  <div className="space-y-4">
+                      <div>
+                          <label className="text-xs text-gray-400 font-mono uppercase block mb-2">Cluster Name</label>
+                          <input
+                              type="text"
+                              value={newClusterName}
+                              onChange={(e) => setNewClusterName(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCreateCluster()}
+                              placeholder="e.g., Development, Research, Archive..."
+                              className="w-full bg-black/50 border border-white/20 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-green-400 transition"
+                              autoFocus
+                          />
+                      </div>
+
+                      <div className="flex gap-3">
+                          <button
+                              onClick={handleCreateCluster}
+                              disabled={!newClusterName.trim()}
+                              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-mono text-sm rounded uppercase tracking-widest shadow-[0_0_20px_rgba(34,197,94,0.3)] transition"
+                          >
+                              Create
+                          </button>
+                          <button
+                              onClick={() => setShowClusterModal(false)}
+                              className="flex-1 px-4 py-2 bg-transparent border border-gray-600 hover:border-gray-400 text-gray-400 hover:text-white font-mono text-sm rounded uppercase tracking-widest transition"
+                          >
+                              Cancel
+                          </button>
+                      </div>
                   </div>
               </div>
           </div>

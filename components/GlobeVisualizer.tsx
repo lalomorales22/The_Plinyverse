@@ -150,19 +150,19 @@ const ZoomListener = ({
 const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: VirtualFile[], onNodeClick: (f: VirtualFile) => void, onNodeContextMenu: (f: VirtualFile, e: any) => void }) => {
   const groupRef = useRef<THREE.Group>(null!);
   
-  // Base particles for the "Globe" structure
-  const particleCount = 1500;
+  // Base particles for the "Globe" structure - OPTIMIZED: Reduced from 1500 to 600
+  const particleCount = 600;
   const positions = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount; i++) {
       const theta = THREE.MathUtils.randFloatSpread(360);
       const phi = THREE.MathUtils.randFloatSpread(360);
-      const r = 3.5 + Math.random() * 0.5; 
-      
+      const r = 3.5 + Math.random() * 0.5;
+
       const x = r * Math.sin(theta) * Math.cos(phi);
       const y = r * Math.sin(theta) * Math.sin(phi);
       const z = r * Math.cos(theta);
-      
+
       pos[i * 3] = x;
       pos[i * 3 + 1] = y;
       pos[i * 3 + 2] = z;
@@ -218,20 +218,33 @@ interface DataNodeProps {
 
 const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onContextMenu }) => {
     const meshRef = useRef<THREE.Mesh>(null);
+    const haloRef = useRef<THREE.Mesh>(null);
     const [hovered, setHovered] = useState(false);
-    const [targetPos, setTargetPos] = useState<[number, number, number]>([0,0,0]);
-    
+
+    // PERFORMANCE FIX: Reuse Vector3 objects instead of creating new ones every frame
+    const targetPosRef = useRef(new THREE.Vector3(0, 0, 0));
+
     // Calculate final position on sphere
     useEffect(() => {
         const [x, y, z] = calculateNodePosition(index, total);
-        setTargetPos([x,y,z]);
+        targetPosRef.current.set(x, y, z);
     }, [index, total]);
 
-    // Animation: Explode from center to target position
+    // PERFORMANCE FIX: Use scale for hover effect instead of rebuilding geometry
     useFrame(() => {
         if (meshRef.current) {
             // Lerp current position to target position
-            meshRef.current.position.lerp(new THREE.Vector3(...targetPos), 0.08);
+            meshRef.current.position.lerp(targetPosRef.current, 0.08);
+
+            // Smooth scale transition on hover
+            const targetScale = hovered ? 1.4 : 1.0;
+            const currentScale = meshRef.current.scale.x;
+            const newScale = currentScale + (targetScale - currentScale) * 0.15;
+            meshRef.current.scale.setScalar(newScale);
+
+            if (haloRef.current) {
+                haloRef.current.scale.setScalar(newScale * 1.4);
+            }
         }
     });
 
@@ -245,12 +258,12 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
             default: return '#eab308'; // Yellow (Data/Dir)
         }
     }
-    
+
     const color = getColor(file.type);
 
     return (
         <group>
-            <mesh 
+            <mesh
                 ref={meshRef}
                 position={[0,0,0]} // Start at center for explosion effect
                 onClick={(e) => { e.stopPropagation(); onClick(file); }}
@@ -258,35 +271,33 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 onPointerOver={() => setHovered(true)}
                 onPointerOut={() => setHovered(false)}
             >
-                <sphereGeometry args={[hovered ? 0.35 : 0.25, 32, 32]} />
-                <meshStandardMaterial 
-                    color={color} 
-                    emissive={color} 
+                {/* PERFORMANCE FIX: Fixed geometry size, use scale for hover */}
+                <sphereGeometry args={[0.25, 24, 24]} />
+                <meshStandardMaterial
+                    color={color}
+                    emissive={color}
                     emissiveIntensity={hovered ? 2.5 : 0.8}
                     roughness={0.1}
                     metalness={0.6}
                 />
-                
-                {/* Glow Halo */}
-                <mesh scale={[1.4, 1.4, 1.4]}>
-                    <sphereGeometry args={[hovered ? 0.35 : 0.25, 32, 32]} />
-                    <meshBasicMaterial color={color} transparent opacity={0.1} depthWrite={false} />
+
+                {/* Glow Halo - PERFORMANCE FIX: Removed point light, using only emissive */}
+                <mesh ref={haloRef} scale={[1.4, 1.4, 1.4]}>
+                    <sphereGeometry args={[0.25, 16, 16]} />
+                    <meshBasicMaterial color={color} transparent opacity={hovered ? 0.2 : 0.1} depthWrite={false} />
                 </mesh>
 
-                {/* Inner Light */}
-                <pointLight color={color} intensity={hovered ? 2 : 0.5} distance={3} decay={2} />
-                
-                {/* Text Label - Always Visible */}
-                <Html distanceFactor={12} position={[0, 0.4, 0]} center className="pointer-events-none select-none">
-                     <div className={`transition-opacity duration-500 ${hovered ? 'opacity-100 z-50 scale-110' : 'opacity-80'}`}>
-                        <div className="bg-black/60 backdrop-blur-[2px] px-2 py-0.5 rounded border border-white/10 flex flex-col items-center shadow-lg">
-                             <span className={`text-[10px] font-bold whitespace-nowrap ${hovered ? 'text-white' : 'text-green-400/90'}`}>
-                                 {file.name}
-                             </span>
-                             {hovered && <span className="text-[8px] text-gray-300">{file.type}</span>}
+                {/* PERFORMANCE FIX: Replaced Html label with simple billboard sprite */}
+                {hovered && (
+                    <Html distanceFactor={12} position={[0, 0.5, 0]} center className="pointer-events-none select-none" zIndexRange={[100, 0]}>
+                        <div className="bg-black/80 backdrop-blur-sm px-2 py-1 rounded border border-white/20">
+                            <span className="text-[10px] font-bold text-white whitespace-nowrap block">
+                                {file.name}
+                            </span>
+                            <span className="text-[8px] text-gray-300 block">{file.type}</span>
                         </div>
-                     </div>
-                </Html>
+                    </Html>
+                )}
             </mesh>
         </group>
     )
@@ -331,12 +342,13 @@ const GlobeVisualizer: React.FC<GlobeVisualizerProps> = ({
 }) => {
   return (
     <div className="w-full h-full absolute inset-0 z-0 bg-gradient-to-b from-black via-gray-900 to-black">
-      <Canvas camera={{ position: [0, 0, 22], fov: 60 }}>
+      <Canvas camera={{ position: [0, 0, 22], fov: 60 }} dpr={[1, 2]} performance={{ min: 0.5 }}>
         <color attach="background" args={['#050505']} />
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={1} color="#00ff9d" />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color="#3b82f6" />
-        <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+        {/* PERFORMANCE FIX: Reduced stars from 5000 to 2000 */}
+        <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
         
         <DiveController 
             divingNodeId={divingNodeId} 
