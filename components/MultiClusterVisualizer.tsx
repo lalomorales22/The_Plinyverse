@@ -180,9 +180,8 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
                 <SpriteLabel
                     text={cluster.name}
                     position={[0, 6, 0]}
-                    color={isActive ? '#ffffff' : '#d1d5db'}
-                    backgroundColor={isActive ? 'rgba(34, 197, 94, 0.3)' : 'rgba(0, 0, 0, 0.6)'}
-                    fontSize={isActive ? 60 : 40}
+                    color="#ffffff"
+                    fontSize={isActive ? 72 : 48}
                 />
                 <points>
                     <bufferGeometry>
@@ -307,9 +306,8 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 <SpriteLabel
                     text={file.name}
                     position={[0, 0.8, 0]}
-                    color={hovered ? "#ffffff" : "#eeeeee"}
-                    backgroundColor={hovered ? "rgba(0, 0, 0, 0.8)" : "rgba(0, 0, 0, 0.6)"}
-                    fontSize={hovered ? 48 : 36}
+                    color="#ffffff"
+                    fontSize={hovered ? 56 : 44}
                 />
             </mesh>
         </group>

@@ -21,8 +21,8 @@ export const SpriteLabel: React.FC<SpriteLabelProps> = ({
   text,
   position,
   color = '#ffffff',
-  backgroundColor = 'rgba(0, 0, 0, 0.8)',
-  fontSize = 24,
+  backgroundColor = 'transparent',
+  fontSize = 32,
 }) => {
   const spriteRef = useRef<THREE.Sprite>(null);
 
@@ -37,20 +37,29 @@ export const SpriteLabel: React.FC<SpriteLabelProps> = ({
     canvas.width = 512;
     canvas.height = 128;
 
-    // Draw background
-    context.fillStyle = backgroundColor;
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    // Draw background (transparent by default)
+    if (backgroundColor !== 'transparent') {
+      context.fillStyle = backgroundColor;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     // Draw border - REMOVED as per request
     // context.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     // context.lineWidth = 4;
     // context.strokeRect(0, 0, canvas.width, canvas.height);
 
-    // Draw text
-    context.fillStyle = color;
-    context.font = `bold ${fontSize}px Arial, sans-serif`;
+    // Draw text with outline for better visibility
+    context.font = `bold ${fontSize}px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
+    
+    // Draw text shadow/outline for better contrast
+    context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    context.shadowBlur = 8;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    
+    context.fillStyle = color;
 
     // Truncate text if too long
     let displayText = text;
