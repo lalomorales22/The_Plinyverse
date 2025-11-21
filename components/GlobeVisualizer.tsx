@@ -1,9 +1,10 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Stars, Html } from '@react-three/drei';
+import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import { VirtualFile, FileType } from '../types';
+import { SpriteLabel } from './SpriteLabel';
 
 // Fix for TypeScript errors where R3F elements and HTML elements are not recognized in JSX.IntrinsicElements
 declare global {
@@ -149,12 +150,38 @@ const ZoomListener = ({
 
 const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: VirtualFile[], onNodeClick: (f: VirtualFile) => void, onNodeContextMenu: (f: VirtualFile, e: any) => void }) => {
   const groupRef = useRef<THREE.Group>(null!);
-  
-  // Base particles for the "Globe" structure - OPTIMIZED: Reduced from 1500 to 600
-  const particleCount = 600;
+  const [particleCount, setParticleCount] = useState(600);
+  const { camera } = useThree();
+
+  // PERFORMANCE FIX: LOD system - Adjust particle count based on camera distance
+  useFrame(() => {
+    if (groupRef.current) {
+      const distance = camera.position.distanceTo(groupRef.current.position);
+
+      // Dynamic particle count based on distance
+      let newCount;
+      if (distance < 10) {
+        newCount = 600; // Close: high detail
+      } else if (distance < 20) {
+        newCount = 400; // Medium: medium detail
+      } else if (distance < 30) {
+        newCount = 200; // Far: low detail
+      } else {
+        newCount = 100; // Very far: minimal detail
+      }
+
+      // Only update if changed significantly to avoid re-renders
+      if (Math.abs(particleCount - newCount) > 50) {
+        setParticleCount(newCount);
+      }
+    }
+  });
+
   const positions = useMemo(() => {
-    const pos = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount; i++) {
+    // Generate more particles than needed, then we'll use a subset
+    const maxParticles = 600;
+    const pos = new Float32Array(maxParticles * 3);
+    for (let i = 0; i < maxParticles; i++) {
       const theta = THREE.MathUtils.randFloatSpread(360);
       const phi = THREE.MathUtils.randFloatSpread(360);
       const r = 3.5 + Math.random() * 0.5;
@@ -170,15 +197,20 @@ const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: Virt
     return pos;
   }, []);
 
+  // Use only the number of particles needed for current LOD
+  const activePositions = useMemo(() => {
+    return new Float32Array(positions.buffer, 0, particleCount * 3);
+  }, [positions, particleCount]);
+
   return (
     <group ref={groupRef}>
-        {/* The Static Matrix Grid */}
+        {/* The Static Matrix Grid - PERFORMANCE FIX: Using LOD-based particle count */}
         <points>
           <bufferGeometry>
             <bufferAttribute
               attach="attributes-position"
-              count={positions.length / 3}
-              array={positions}
+              count={particleCount}
+              array={activePositions}
               itemSize={3}
             />
           </bufferGeometry>
@@ -186,7 +218,7 @@ const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: Virt
             size={0.03}
             color="#00ff9d"
             transparent
-            opacity={0.3} 
+            opacity={0.3}
             sizeAttenuation={true}
           />
         </points>
@@ -287,16 +319,15 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                     <meshBasicMaterial color={color} transparent opacity={hovered ? 0.2 : 0.1} depthWrite={false} />
                 </mesh>
 
-                {/* PERFORMANCE FIX: Replaced Html label with simple billboard sprite */}
+                {/* PERFORMANCE FIX: Using canvas-based sprite label instead of HTML overlay */}
                 {hovered && (
-                    <Html distanceFactor={12} position={[0, 0.5, 0]} center className="pointer-events-none select-none" zIndexRange={[100, 0]}>
-                        <div className="bg-black/80 backdrop-blur-sm px-2 py-1 rounded border border-white/20">
-                            <span className="text-[10px] font-bold text-white whitespace-nowrap block">
-                                {file.name}
-                            </span>
-                            <span className="text-[8px] text-gray-300 block">{file.type}</span>
-                        </div>
-                    </Html>
+                    <SpriteLabel
+                        text={file.name}
+                        position={[0, 0.5, 0]}
+                        color="#ffffff"
+                        backgroundColor="rgba(0, 0, 0, 0.8)"
+                        fontSize={20}
+                    />
                 )}
             </mesh>
         </group>

@@ -12,9 +12,12 @@
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
+    "@types/dompurify": "^3.0.5",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
+    "dompurify": "^3.3.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
     "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

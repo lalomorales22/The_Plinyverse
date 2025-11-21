@@ -1,9 +1,10 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Stars, Html } from '@react-three/drei';
+import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import { VirtualFile, FileType, Cluster } from '../types';
+import { SpriteLabel } from './SpriteLabel';
 
 // Fix for TypeScript errors
 declare global {
@@ -105,15 +106,49 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
 }) => {
     const groupRef = useRef<THREE.Group>(null);
     const [hovered, setHovered] = useState(false);
+    const [particleCount, setParticleCount] = useState(isActive ? 400 : 200);
+    const { camera } = useThree();
 
     // Only show files for this cluster
     const clusterFiles = files.filter(f => (f.clusterId || 'root') === cluster.id);
 
-    // Reduced particle count for performance
-    const particleCount = isActive ? 400 : 200;
+    // PERFORMANCE FIX: LOD system - Adjust particle count based on camera distance and active state
+    useFrame(() => {
+        if (groupRef.current) {
+            const distance = camera.position.distanceTo(groupRef.current.position);
+
+            // Dynamic particle count based on distance and active state
+            let newCount;
+            if (isActive) {
+                if (distance < 15) {
+                    newCount = 400; // Active + Close: high detail
+                } else if (distance < 30) {
+                    newCount = 250; // Active + Medium: medium detail
+                } else {
+                    newCount = 150; // Active + Far: low detail
+                }
+            } else {
+                if (distance < 15) {
+                    newCount = 200; // Inactive + Close: medium detail
+                } else if (distance < 30) {
+                    newCount = 100; // Inactive + Medium: low detail
+                } else {
+                    newCount = 50; // Inactive + Far: minimal detail
+                }
+            }
+
+            // Only update if changed significantly
+            if (Math.abs(particleCount - newCount) > 30) {
+                setParticleCount(newCount);
+            }
+        }
+    });
+
     const positions = useMemo(() => {
-        const pos = new Float32Array(particleCount * 3);
-        for (let i = 0; i < particleCount; i++) {
+        // Generate max particles
+        const maxParticles = 400;
+        const pos = new Float32Array(maxParticles * 3);
+        for (let i = 0; i < maxParticles; i++) {
             const theta = THREE.MathUtils.randFloatSpread(360);
             const phi = THREE.MathUtils.randFloatSpread(360);
             const r = 3.5 + Math.random() * 0.5;
@@ -127,28 +162,31 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
             pos[i * 3 + 2] = z;
         }
         return pos;
-    }, [particleCount]);
+    }, []);
+
+    // Use only the number of particles needed for current LOD
+    const activePositions = useMemo(() => {
+        return new Float32Array(positions.buffer, 0, particleCount * 3);
+    }, [positions, particleCount]);
 
     return (
         <group ref={groupRef} position={cluster.position}>
-            {/* Cluster Name Label */}
-            <Html position={[0, 6, 0]} center className="pointer-events-none select-none">
-                <div className={`transition-all duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
-                    <div className={`px-4 py-2 rounded-lg border ${isActive ? 'bg-green-500/30 border-green-400' : 'bg-black/60 border-white/20'} backdrop-blur-sm`}>
-                        <span className={`font-bold font-mono ${isActive ? 'text-white text-sm' : 'text-gray-300 text-xs'}`}>
-                            {cluster.name}
-                        </span>
-                    </div>
-                </div>
-            </Html>
+            {/* PERFORMANCE FIX: Cluster Name Label using sprite instead of HTML */}
+            <SpriteLabel
+                text={cluster.name}
+                position={[0, 6, 0]}
+                color={isActive ? '#ffffff' : '#d1d5db'}
+                backgroundColor={isActive ? 'rgba(34, 197, 94, 0.3)' : 'rgba(0, 0, 0, 0.6)'}
+                fontSize={isActive ? 26 : 22}
+            />
 
-            {/* Background particles */}
+            {/* Background particles - PERFORMANCE FIX: Using LOD-based particle count */}
             <points>
                 <bufferGeometry>
                     <bufferAttribute
                         attach="attributes-position"
-                        count={positions.length / 3}
-                        array={positions}
+                        count={particleCount}
+                        array={activePositions}
                         itemSize={3}
                     />
                 </bufferGeometry>
@@ -273,16 +311,15 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                     <meshBasicMaterial color={color} transparent opacity={hovered ? 0.2 : 0.1} depthWrite={false} />
                 </mesh>
 
-                {/* Only show label on hover for performance */}
+                {/* PERFORMANCE FIX: Using canvas-based sprite label instead of HTML overlay */}
                 {hovered && (
-                    <Html distanceFactor={12} position={[0, 0.5, 0]} center className="pointer-events-none select-none" zIndexRange={[100, 0]}>
-                        <div className="bg-black/80 backdrop-blur-sm px-2 py-1 rounded border border-white/20">
-                            <span className="text-[10px] font-bold text-white whitespace-nowrap block">
-                                {file.name}
-                            </span>
-                            <span className="text-[8px] text-gray-300 block">{file.type}</span>
-                        </div>
-                    </Html>
+                    <SpriteLabel
+                        text={file.name}
+                        position={[0, 0.5, 0]}
+                        color="#ffffff"
+                        backgroundColor="rgba(0, 0, 0, 0.8)"
+                        fontSize={20}
+                    />
                 )}
             </mesh>
         </group>
