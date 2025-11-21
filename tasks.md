@@ -1,16 +1,33 @@
-# Gemini3 Development Tasks & Ideation
+# PLINYVERSE Development Tasks & Roadmap
 
-## Core Tasks
-- [x] Initialize React + TypeScript + Tailwind environment.
-- [x] Implement React Three Fiber (R3F) for the 3D Globe Matrix.
-- [x] Integrate `@google/genai` SDK for the AI Kernel.
-- [x] Create Virtual File System (VFS) state management.
-- [ ] Implement Real-time Audio/Video generation (Veo/Imagen integration placeholders).
-- [ ] Add OAuth/MCP simulation for external data providers.
+## Completed Core Tasks ✅
+- [x] Initialize React + TypeScript environment
+- [x] Implement React Three Fiber (R3F) for the 3D Globe Matrix
+- [x] Integrate Ollama (local AI) for the AI Kernel
+- [x] Create Virtual File System (VFS) state management
+- [x] Implement SQLite persistent database backend
+- [x] Multi-cluster support with 3D visualization
+- [x] GitHub repository cloning and visualization
+- [x] Drag & drop file/folder ingestion
+- [x] Security hardening (input validation, XSS prevention, rate limiting)
+- [x] Database migration system for schema updates
 
-## Discovery Questions (Ideation Phase)
-To further evolve the "Gemini3" concept into the unique application described, consider these questions:
+## In Progress 🔄
+- [ ] Enhanced error handling and user feedback
+- [ ] Database connection pooling optimization
+- [ ] API versioning (/api/v1/)
 
-1. **The Data "Soul":** You mentioned visualizing user data as a connected bubble map. Should the AI purely *observe* this data, or should it proactively *restructure* the data nodes based on semantic similarity (clustering similar files/ideas together physically in the 3D space)?
-2. **The "OS" Boundaries:** Should this "OS" be ephemeral (resetting on reload) or should we implement a persistent browser-based database (IndexedDB) so the "world" grows permanently as you interact with it?
-3. **The Creative Engine:** When you say "software generation," do you envision the AI generating code snippets for you to read, or do you want the app to attempt to *execute* simple Javascript modules within a sandboxed environment inside the 3D world?
+## Future Features 🚀
+- [ ] Real-time collaborative editing
+- [ ] Advanced AI-driven file operations (refactoring, optimization)
+- [ ] Plugin/extension system
+- [ ] Export/import of entire file systems
+- [ ] Performance monitoring dashboard
+- [ ] WebSocket support for real-time updates
+- [ ] Authentication and user management
+
+## Architecture Decisions
+- **AI Provider**: Ollama (local inference) instead of cloud-based APIs
+- **Database**: SQLite for lightweight, serverless persistence
+- **3D Engine**: React Three Fiber for performance and React integration
+- **Security**: Defense-in-depth approach with multiple validation layers

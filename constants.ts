@@ -1,3 +1,4 @@
+import { FileType } from './types';
 
 export const INITIAL_SYSTEM_PROMPT = `
 You are the kernel of PLINYVERSE, a futuristic 3D operating system and visualization database.
@@ -25,22 +26,22 @@ Schema:
 export const ROOT_CLARITAS_ID = 'dir_claritas';
 export const ROOT_LIBERTAS_ID = 'dir_libertas';
 
-// Only define the Container Roots here. 
+// Only define the Container Roots here.
 // The content files are now loaded dynamically from the utils/fileLoader.ts
 export const ROOT_DIRECTORIES = [
-  { 
-    id: ROOT_CLARITAS_ID, 
-    name: 'CL4R1T4S', 
-    type: 'DIRECTORY', 
-    content: 'Root Node: Structure & Definition', 
+  {
+    id: ROOT_CLARITAS_ID,
+    name: 'CL4R1T4S',
+    type: FileType.DIRECTORY,
+    content: 'Root Node: Structure & Definition',
     createdAt: Date.now(),
     parentId: 'root'
   },
-  { 
-    id: ROOT_LIBERTAS_ID, 
-    name: 'L1B3RT4S', 
-    type: 'DIRECTORY', 
-    content: 'Root Node: Freedom & Expansion', 
+  {
+    id: ROOT_LIBERTAS_ID,
+    name: 'L1B3RT4S',
+    type: FileType.DIRECTORY,
+    content: 'Root Node: Freedom & Expansion',
     createdAt: Date.now(),
     parentId: 'root'
   }
