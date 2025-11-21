@@ -323,9 +323,8 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 <SpriteLabel
                     text={file.name}
                     position={[0, 0.5, 0]}
-                    color={hovered ? "#ffffff" : "#aaaaaa"}
-                    backgroundColor={hovered ? "rgba(0, 0, 0, 0.8)" : "rgba(0, 0, 0, 0.6)"}
-                    fontSize={hovered ? 20 : 16}
+                    color="#ffffff"
+                    fontSize={hovered ? 28 : 24}
                 />
             </mesh>
         </group>
