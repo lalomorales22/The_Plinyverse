@@ -17,6 +17,7 @@ declare global {
 interface GlobeVisualizerProps {
   files: VirtualFile[];
   onNodeClick: (file: VirtualFile) => void;
+  onNodeContextMenu: (file: VirtualFile, event: any) => void;
   divingNodeId: string | null;
   onDiveComplete: () => void;
   canNavigateUp: boolean;
@@ -146,7 +147,7 @@ const ZoomListener = ({
     return null;
 }
 
-const ParticleSphere = ({ files, onNodeClick }: { files: VirtualFile[], onNodeClick: (f: VirtualFile) => void }) => {
+const ParticleSphere = ({ files, onNodeClick, onNodeContextMenu }: { files: VirtualFile[], onNodeClick: (f: VirtualFile) => void, onNodeContextMenu: (f: VirtualFile, e: any) => void }) => {
   const groupRef = useRef<THREE.Group>(null!);
   
   // Base particles for the "Globe" structure
@@ -198,6 +199,7 @@ const ParticleSphere = ({ files, onNodeClick }: { files: VirtualFile[], onNodeCl
                 index={idx} 
                 total={files.length}
                 onClick={onNodeClick}
+                onContextMenu={onNodeContextMenu}
             />
         ))}
         
@@ -211,9 +213,10 @@ interface DataNodeProps {
   index: number;
   total: number;
   onClick: (file: VirtualFile) => void;
+  onContextMenu: (file: VirtualFile, event: any) => void;
 }
 
-const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick }) => {
+const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onContextMenu }) => {
     const meshRef = useRef<THREE.Mesh>(null);
     const [hovered, setHovered] = useState(false);
     const [targetPos, setTargetPos] = useState<[number, number, number]>([0,0,0]);
@@ -251,15 +254,27 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick }) => {
                 ref={meshRef}
                 position={[0,0,0]} // Start at center for explosion effect
                 onClick={(e) => { e.stopPropagation(); onClick(file); }}
+                onContextMenu={(e) => { e.stopPropagation(); onContextMenu(file, e); }}
                 onPointerOver={() => setHovered(true)}
                 onPointerOut={() => setHovered(false)}
             >
-                <sphereGeometry args={[hovered ? 0.3 : 0.2, 16, 16]} />
+                <sphereGeometry args={[hovered ? 0.35 : 0.25, 32, 32]} />
                 <meshStandardMaterial 
                     color={color} 
                     emissive={color} 
-                    emissiveIntensity={hovered ? 3 : 1.5} 
+                    emissiveIntensity={hovered ? 2.5 : 0.8}
+                    roughness={0.1}
+                    metalness={0.6}
                 />
+                
+                {/* Glow Halo */}
+                <mesh scale={[1.4, 1.4, 1.4]}>
+                    <sphereGeometry args={[hovered ? 0.35 : 0.25, 32, 32]} />
+                    <meshBasicMaterial color={color} transparent opacity={0.1} depthWrite={false} />
+                </mesh>
+
+                {/* Inner Light */}
+                <pointLight color={color} intensity={hovered ? 2 : 0.5} distance={3} decay={2} />
                 
                 {/* Text Label - Always Visible */}
                 <Html distanceFactor={12} position={[0, 0.4, 0]} center className="pointer-events-none select-none">
@@ -308,6 +323,7 @@ const NetworkLines = ({ count, opacity }: { count: number, opacity: number }) =>
 const GlobeVisualizer: React.FC<GlobeVisualizerProps> = ({ 
     files, 
     onNodeClick, 
+    onNodeContextMenu,
     divingNodeId, 
     onDiveComplete,
     canNavigateUp,
@@ -333,7 +349,7 @@ const GlobeVisualizer: React.FC<GlobeVisualizerProps> = ({
             onNavigateUp={onNavigateUp} 
         />
 
-        <ParticleSphere files={files} onNodeClick={onNodeClick} />
+        <ParticleSphere files={files} onNodeClick={onNodeClick} onNodeContextMenu={onNodeContextMenu} />
         
         <OrbitControls 
             makeDefault

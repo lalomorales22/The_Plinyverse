@@ -1,50 +1,71 @@
 # PLINYVERSE
 
+**Repository:** [lalomorales22/plinyverse](https://github.com/lalomorales22/plinyverse)
+
 ## Overview
-**PLINYVERSE** is a conceptual 3D Visualization Database (VDB) Operating System running in the browser. It utilizes a reactive 3D Neural Globe Matrix to visualize data nodes, folders, and media files as interconnected entities in a void.
+**PLINYVERSE** is a futuristic, 3D Visualization Database (VDB) Operating System that runs in your browser. It reimagines file management and data exploration by transforming your file system into a reactive **3D Neural Globe Matrix**. Instead of navigating boring lists and icons, you explore data nodes, folders, and media as interconnected, glowing entities floating in a digital void.
 
-Powered by **Ollama** (local AI inference), the system acts as an intelligent kernel (`PLINY-KERNEL`), capable of understanding natural language to navigate, create, and manipulate the persistent virtual file system. Users can select from any locally installed Ollama model.
+Powered by **Ollama** (local AI inference) and a persistent **SQLite** backend, the system acts as an intelligent kernel (`PLINY-KERNEL`). It allows you to navigate, create, and manipulate a persistent virtual file system using natural language, drag-and-drop interactions, and immersive 3D navigation.
 
-## Progress & Features
+## What is it for?
+The Plinyverse is designed for:
+*   **Visual Data Exploration**: Seeing the relationships and hierarchy of your data in 3D space.
+*   **Immersive File Management**: A sci-fi interface for organizing code, media, and documents.
+*   **AI-Assisted Workflows**: Using local LLMs to generate file structures, summarize content, or assist with coding tasks within the environment.
+*   **Repository Visualization**: Cloning GitHub repositories and instantly visualizing their structure as a 3D galaxy of code.
 
-### Core Architecture
-- [x] **React Three Fiber (R3F) 3D Engine**: A completely custom 3D renderer using particle systems and instanced meshes for high-performance data visualization.
-- [x] **Persistent VDB**: A flat-file database structure implemented in state, ensuring files and folders persist during a session.
-- [x] **Glassmorphism HUD**: A futuristic "OS-like" interface overlaying the 3D world.
+## Key Features
 
-### Navigation & Interaction
-- [x] **Neural Dive**: Click to zoom and "warp" into folders (Directories), revealing their inner contents as new explosive clusters.
-- [x] **Breadcrumb History**: Track your path through the `CL4R1T4S` and `L1B3RT4S` data structures.
-- [x] **Manual Camera Control**: Full orbit, zoom, and pan controls with damping for a smooth feel.
-- [x] **Warp Speed Animation**: Cinematic camera effects when transitioning between data layers.
+### 🌌 Core Architecture
+*   **3D Engine**: Built with **React Three Fiber (R3F)**, featuring custom particle systems, instanced meshes, and post-processing effects for a high-performance, cinematic experience.
+*   **Persistent Database**: A **SQLite** backend ensures that all your imported files, folders, and GitHub clones are saved locally and persist between sessions.
+*   **Local AI Integration**: Connects directly to your local **Ollama** instance, allowing you to chat with your file system and perform AI-driven operations using models like Llama 3, Mistral, or Gemma.
 
-### Data Ingestion & Viewing
-- [x] **Drag & Drop Ingestion**: Drag *any* file (Images, Videos, PDF, Text) from your computer directly onto the 3D globe to import it.
-- [x] **Contextual Injection**: Use the "Import" tab or "Inject Here" context menu to add files specifically to the node you are inspecting.
-- [x] **Multi-Format Support**:
-    - **Images**: Opens in a holographic Gallery Viewer.
-    - **Videos**: Plays in an embedded media player node.
-    - **PDFs**: Renders in an integrated document reader.
-    - **Text/Code**: Opens in a syntax-highlighted terminal editor.
+### 🧭 Navigation & Interaction
+*   **Neural Dive**: Seamlessly zoom and "warp" into folders. Clicking a directory node automatically triggers a cinematic camera dive into that cluster, revealing its inner contents.
+*   **Smart Navigation**: 
+    *   **CL4R1T4S**: Auto-dives into folders for rapid exploration.
+    *   **L1B3RT4S**: Navigates to the file's location in 3D space for inspection.
+*   **Glassmorphism HUD**: A sleek, draggable, and minimizable OS interface for managing the terminal, imports, and settings.
 
-### Initial Data State
-The system boots with two primary root clusters:
-1.  **CL4R1T4S**: Contains structured data, manifestos, and clear-text definitions.
-2.  **L1B3RT4S**: Contains creative works, free-form data, and expansions.
+### 📥 Data Ingestion & Sync
+*   **GitHub Cloning**: Paste a GitHub repository URL to instantly clone the entire codebase into your Plinyverse. The system fetches branches, creates the directory structure, and downloads file contents automatically.
+*   **Drag & Drop**: Drag *any* file or folder from your computer directly onto the 3D globe to ingest it into the database.
+*   **Multi-Format Support**:
+    *   **Code**: Syntax-highlighted editor.
+    *   **Images**: Holographic gallery viewer.
+    *   **Videos**: Embedded media player.
+    *   **PDFs**: Integrated document reader.
 
-## Setup & Usage
+## Getting Started
 
 ### Prerequisites
-1.  **Install Ollama**: Download and install Ollama from [https://ollama.com](https://ollama.com)
-2.  **Pull a Model**: Run `ollama pull llama2` (or any other model like `mistral`, `codellama`, `phi`, etc.)
-3.  **Start Ollama**: Run `ollama serve` to start the local Ollama server (default: http://localhost:11434)
+1.  **Node.js**: Ensure you have Node.js installed (v18+ recommended).
+2.  **Ollama (Optional but Recommended)**:
+    *   Download from [ollama.com](https://ollama.com).
+    *   Pull a model: `ollama pull llama3` (or your preferred model).
+    *   Start the server: `ollama serve`.
 
-### Usage
-1.  **Start the App**: Run `npm install` and `npm run dev`
-2.  **Model Selection**: The app will automatically detect available Ollama models. Select your preferred model from the dropdown in the terminal interface.
-3.  **Exploration**: Use the mouse to rotate the globe. Click nodes to inspect. Click "Neural Dive" to enter folders.
-4.  **Creation**: Use the Console to ask the AI to create folders (e.g., "Create a directory for my python scripts").
-5.  **Importing**: Drag files onto the screen to populate your Plinyverse.
+### Installation & Run
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/lalomorales22/plinyverse.git
+    cd plinyverse
+    ```
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Start the application (Frontend + Backend):
+    ```bash
+    npm run dev
+    ```
+4.  Open your browser to `http://localhost:3000`.
 
-### Configuration
-- **Custom Ollama URL**: Set the `OLLAMA_BASE_URL` environment variable if Ollama is running on a different host/port (default: http://localhost:11434)
+## Project Structure
+The system boots with two primary root clusters:
+*   **CL4R1T4S**: Represents structure, definitions, and documentation.
+*   **L1B3RT4S**: Represents creative works, free-form data, and expansions.
+
+---
+*Built with React, Three.js, Express, SQLite, and Ollama.*

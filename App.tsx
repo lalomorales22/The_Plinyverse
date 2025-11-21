@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import GlobeVisualizer from './components/GlobeVisualizer';
 import TerminalOverlay from './components/TerminalOverlay';
@@ -6,21 +5,38 @@ import { sendCommandToKernel, listAvailableModels, checkOllamaStatus, OllamaMode
 import { INITIAL_SYSTEM_PROMPT, ROOT_DIRECTORIES } from './constants';
 import { loadInitialProjectFiles } from './utils/fileLoader';
 import { SystemMessage, VirtualFile, FileType, DirectoryState } from './types';
+import { dbService } from './services/dbService';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 const App: React.FC = () => {
   // --- Persistent File System State ---
   // Initialize with Root Directories + Dynamically Loaded Project Files
-  const [allFiles, setAllFiles] = useState<VirtualFile[]>(() => {
-      const rootDirs = ROOT_DIRECTORIES.map(f => ({
-          ...f, 
-          type: f.type as FileType, 
-          parentId: f.parentId || 'root' 
-      }));
-      const projectFiles = loadInitialProjectFiles();
-      return [...rootDirs, ...projectFiles];
-  });
+  const [allFiles, setAllFiles] = useState<VirtualFile[]>([]);
+
+  // Load files from DB on mount
+  useEffect(() => {
+      const initFiles = async () => {
+          const dbFiles = await dbService.getAllFiles();
+          
+          if (dbFiles.length === 0) {
+              // First run: Load initial files and save to DB
+              const rootDirs = ROOT_DIRECTORIES.map(f => ({
+                  ...f, 
+                  type: f.type as FileType, 
+                  parentId: f.parentId || 'root' 
+              }));
+              const projectFiles = loadInitialProjectFiles();
+              const initialFiles = [...rootDirs, ...projectFiles];
+              
+              await dbService.saveFilesBatch(initialFiles);
+              setAllFiles(initialFiles);
+          } else {
+              setAllFiles(dbFiles);
+          }
+      };
+      initFiles();
+  }, []);
 
   // --- Navigation State (History Stack) ---
   const [directoryStack, setDirectoryStack] = useState<DirectoryState[]>([
@@ -54,6 +70,41 @@ const App: React.FC = () => {
   // Hidden file input ref for "Inject Data"
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const pendingImportTargetRef = useRef<VirtualFile | null>(null);
+
+  // --- Context Menu State ---
+  const [contextMenu, setContextMenu] = useState<{
+      visible: boolean;
+      x: number;
+      y: number;
+      file: VirtualFile | null;
+  }>({ visible: false, x: 0, y: 0, file: null });
+
+  const handleNodeContextMenu = (file: VirtualFile, event: any) => {
+      // Handle both native DOM events and R3F events
+      if (event.nativeEvent) {
+          event.nativeEvent.preventDefault();
+          event.nativeEvent.stopPropagation();
+      } else if (event.preventDefault) {
+          event.preventDefault();
+          event.stopPropagation();
+      }
+      
+      // Get coordinates safely
+      const x = event.clientX || event.nativeEvent?.clientX || 0;
+      const y = event.clientY || event.nativeEvent?.clientY || 0;
+
+      setContextMenu({
+          visible: true,
+          x: x,
+          y: y,
+          file: file
+      });
+  };
+
+  const handleCloseContextMenu = () => {
+      setContextMenu({ visible: false, x: 0, y: 0, file: null });
+  };
 
   // --- Load Ollama Models on Mount ---
   useEffect(() => {
@@ -127,6 +178,7 @@ const App: React.FC = () => {
       });
       
       if (newFiles.length > 0) {
+          await dbService.saveFilesBatch(newFiles);
           setAllFiles(prev => [...prev, ...newFiles]);
       }
     }
@@ -140,6 +192,7 @@ const App: React.FC = () => {
             content: node.description || "",
             createdAt: Date.now()
         }));
+        await dbService.saveFilesBatch(newNodes);
         setAllFiles(prev => [...prev, ...newNodes]);
     }
 
@@ -150,7 +203,14 @@ const App: React.FC = () => {
 
   const handleNodeClick = (file: VirtualFile) => {
       if (divingNodeId) return; // Prevent clicks during animation
-      setSelectedNode(file);
+      
+      // Auto-dive for directories
+      if (file.type === FileType.DIRECTORY || file.type === FileType.DATA_NODE) {
+          setDivingNodeId(file.id);
+          setSelectedNode(null); // Ensure modal is closed
+      } else {
+          setSelectedNode(file);
+      }
   };
 
   const handleCloseModal = () => {
@@ -217,7 +277,7 @@ const App: React.FC = () => {
     // Find the directory object for the parent
     const parentDir = allFiles.find(f => f.id === file.parentId);
     
-    // If parent is root, just go to root
+    // 1. Navigate to the parent directory
     if (file.parentId === 'root') {
         setDirectoryStack([{ id: 'root', name: 'ROOT' }]);
     } else if (parentDir) {
@@ -230,8 +290,17 @@ const App: React.FC = () => {
         ]);
     }
 
-    // Trigger selection/inspection
-    setSelectedNode(file);
+    // 2. Handle behavior based on file type
+    if (file.type === FileType.DIRECTORY || file.type === FileType.DATA_NODE) {
+        // For folders (e.g. in CL4R1T4S), animate/dive into them immediately
+        // Do NOT open the modal
+        setDivingNodeId(file.id);
+        setSelectedNode(null);
+    } else {
+        // For files (e.g. in L1B3RT4S), just show them in the view (by being in parent dir)
+        // Do NOT open the modal immediately (user must click again)
+        setSelectedNode(null);
+    }
   };
 
   // --- Remote Sync (GitHub) ---
@@ -251,13 +320,19 @@ const App: React.FC = () => {
           const repoName = `${owner}/${repo}`;
           setMessages(prev => [...prev, { id: generateId(), role: 'system', content: `>> FETCHING: Downloading tree for ${repoName}...`, timestamp: Date.now() }]);
 
-          // Attempt to fetch from Public GitHub API
-          const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`;
-          const response = await fetch(apiUrl);
+          // 1. Get Default Branch (Try main then master)
+          let branch = 'main';
+          let apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+          let response = await fetch(apiUrl);
           
           if (!response.ok) {
-              // Fallback to simulation if private or rate-limited or branch is master
-               throw new Error("Repo not accessible via public API");
+              branch = 'master';
+              apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+              response = await fetch(apiUrl);
+          }
+          
+          if (!response.ok) {
+               throw new Error("Repo not accessible via public API (Check branch or privacy)");
           }
           
           const data = await response.json();
@@ -274,11 +349,6 @@ const App: React.FC = () => {
               createdAt: Date.now()
           }];
           
-          // Map GitHub Tree to VirtualFiles
-          // Note: Flattening strict hierarchy for VDB visualization
-          // We create folders for top-level dirs, but deeply nested files might get flattened into them for simplicity in this demo
-          // Or we could be more rigorous. Let's be rigorous.
-          
           const pathMap: {[key: string]: string} = { "": repoDirId }; // path -> nodeId
 
           // Helper to get parent ID
@@ -287,28 +357,86 @@ const App: React.FC = () => {
               return pathMap[parentPath] || repoDirId;
           }
 
-          for (const node of data.tree) {
+          // Separate folders and files
+          const dirs = data.tree.filter((n: any) => n.type === 'tree').sort((a: any, b: any) => a.path.length - b.path.length);
+          const files = data.tree.filter((n: any) => n.type === 'blob');
+
+          // Process Directories First
+          dirs.forEach((node: any) => {
              const nodeId = generateId();
              pathMap[node.path] = nodeId;
-             
              const parentId = getParentId(node.path);
              const name = node.path.split('/').pop() || node.path;
-             
-             let type = FileType.TEXT;
-             if (node.type === 'tree') type = FileType.DIRECTORY;
-             else if (name.endsWith('.ts') || name.endsWith('.tsx') || name.endsWith('.js')) type = FileType.CODE;
-             else if (name.endsWith('.png') || name.endsWith('.jpg')) type = FileType.IMAGE;
-             else if (name.endsWith('.md')) type = FileType.TEXT;
              
              newFiles.push({
                  id: nodeId,
                  parentId: parentId,
                  name: name,
-                 type: type,
-                 content: node.url || "Remote Content", // Real content requires another fetch per file
+                 type: FileType.DIRECTORY,
+                 content: "Directory",
                  createdAt: Date.now()
              });
+          });
+
+          // Process Files with Content Fetching
+          setMessages(prev => [...prev, { id: generateId(), role: 'system', content: `>> DOWNLOADING: Fetching ${files.length} files...`, timestamp: Date.now() }]);
+
+          const processFile = async (node: any) => {
+             const nodeId = generateId();
+             const parentId = getParentId(node.path);
+             const name = node.path.split('/').pop() || node.path;
+             
+             let type = FileType.TEXT;
+             if (name.endsWith('.ts') || name.endsWith('.tsx') || name.endsWith('.js') || name.endsWith('.jsx')) type = FileType.CODE;
+             else if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif')) type = FileType.IMAGE;
+             else if (name.endsWith('.md')) type = FileType.TEXT;
+             else if (name.endsWith('.json')) type = FileType.CODE;
+             else if (name.endsWith('.css') || name.endsWith('.scss')) type = FileType.CODE;
+             else if (name.endsWith('.html')) type = FileType.CODE;
+             
+             let content = "";
+             try {
+                 // Encode path to handle special characters (spaces, #, etc.)
+                 const encodedPath = node.path.split('/').map((segment: string) => encodeURIComponent(segment)).join('/');
+                 const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodedPath}`;
+                 
+                 if (type === FileType.IMAGE) {
+                     content = rawUrl; 
+                 } else {
+                     const res = await fetch(rawUrl);
+                     if (res.ok) {
+                         content = await res.text();
+                     } else {
+                         content = `Error fetching content: ${res.statusText} (URL: ${rawUrl})`;
+                     }
+                 }
+             } catch (err) {
+                 content = "Failed to fetch content.";
+             }
+
+             newFiles.push({
+                 id: nodeId,
+                 parentId: parentId,
+                 name: name,
+                 type: type,
+                 content: content,
+                 createdAt: Date.now()
+             });
+          };
+
+          // Batch process files
+          const batchSize = 10;
+          for (let i = 0; i < files.length; i += batchSize) {
+              const batch = files.slice(i, i + batchSize);
+              await Promise.all(batch.map(processFile));
+              // Update progress message every 50 files
+              if (i > 0 && i % 50 === 0) {
+                   setMessages(prev => [...prev, { id: generateId(), role: 'system', content: `>> PROGRESS: ${i}/${files.length} files downloaded...`, timestamp: Date.now() }]);
+              }
           }
+
+          // Save to DB
+          await dbService.saveFilesBatch(newFiles);
 
           setAllFiles(prev => [...prev, ...newFiles]);
           setMessages(prev => [...prev, { id: generateId(), role: 'system', content: `>> SUCCESS: Cloned ${newFiles.length} nodes from ${repoName}.`, timestamp: Date.now() }]);
@@ -357,13 +485,18 @@ const App: React.FC = () => {
       
       // Determine target parent
       let targetParentId = currentDirectory.id;
-      if (selectedNode && (selectedNode.type === FileType.DIRECTORY || selectedNode.type === FileType.DATA_NODE)) {
+      
+      // Prioritize Context Menu target if active
+      if (contextMenu.file && (contextMenu.file.type === FileType.DIRECTORY || contextMenu.file.type === FileType.DATA_NODE)) {
+          targetParentId = contextMenu.file.id;
+      } else if (selectedNode && (selectedNode.type === FileType.DIRECTORY || selectedNode.type === FileType.DATA_NODE)) {
           targetParentId = selectedNode.id;
       }
 
       await processFiles(Array.from(uploadedFiles), targetParentId);
       
       setSelectedNode(null); 
+      setContextMenu({ ...contextMenu, visible: false, file: null });
       e.target.value = '';
   };
   
@@ -372,7 +505,11 @@ const App: React.FC = () => {
       if (!uploadedFiles || uploadedFiles.length === 0) return;
       
       let targetParentId = currentDirectory.id;
-      if (selectedNode && (selectedNode.type === FileType.DIRECTORY || selectedNode.type === FileType.DATA_NODE)) {
+      
+      // Prioritize Context Menu target if active
+      if (contextMenu.file && (contextMenu.file.type === FileType.DIRECTORY || contextMenu.file.type === FileType.DATA_NODE)) {
+          targetParentId = contextMenu.file.id;
+      } else if (selectedNode && (selectedNode.type === FileType.DIRECTORY || selectedNode.type === FileType.DATA_NODE)) {
           targetParentId = selectedNode.id;
       }
       
@@ -380,6 +517,7 @@ const App: React.FC = () => {
       await reconstructDirectoryTree(Array.from(uploadedFiles), targetParentId);
       
       setSelectedNode(null);
+      setContextMenu({ ...contextMenu, visible: false, file: null });
       e.target.value = '';
   }
 
@@ -393,8 +531,9 @@ const App: React.FC = () => {
   };
 
   // --- Delete File ---
-  const handleDeleteFile = useCallback((fileId: string) => {
+  const handleDeleteFile = useCallback(async (fileId: string) => {
       // Remove file from the database
+      await dbService.deleteFile(fileId);
       setAllFiles(prev => prev.filter(f => f.id !== fileId));
 
       // Add system message
@@ -454,6 +593,8 @@ const App: React.FC = () => {
               createdAt: Date.now()
           });
       }
+      
+      await dbService.saveFilesBatch(newVirtualFiles);
       setAllFiles(prev => [...prev, ...newVirtualFiles]);
   };
   
@@ -528,6 +669,7 @@ const App: React.FC = () => {
           });
       }
       
+      await dbService.saveFilesBatch(newFiles);
       setAllFiles(prev => [...prev, ...newFiles]);
   };
 
@@ -601,6 +743,7 @@ const App: React.FC = () => {
           content: `>> RECURSIVE SCAN: Imported ${newFiles.length} items from dropped structure.`, 
           timestamp: Date.now() 
         }]);
+        await dbService.saveFilesBatch(newFiles);
         setAllFiles(prev => [...prev, ...newFiles]);
     }
   };
@@ -637,11 +780,59 @@ const App: React.FC = () => {
       <GlobeVisualizer 
         files={visibleFiles} 
         onNodeClick={handleNodeClick}
+        onNodeContextMenu={handleNodeContextMenu}
         divingNodeId={divingNodeId}
         onDiveComplete={handleDiveComplete}
         canNavigateUp={directoryStack.length > 1}
         onNavigateUp={handleNavigateUp}
       />
+      
+      {/* Context Menu */}
+      {contextMenu.visible && contextMenu.file && (
+          <div 
+              className="absolute z-50 bg-black/90 border border-green-500/30 rounded-lg shadow-xl backdrop-blur-md flex flex-col gap-1 min-w-[180px] overflow-hidden"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onMouseLeave={handleCloseContextMenu}
+          >
+              <div className="px-3 py-2 text-xs text-gray-400 border-b border-white/10 font-mono bg-white/5">
+                  {contextMenu.file.name}
+              </div>
+              
+              <button 
+                  onClick={() => {
+                      pendingImportTargetRef.current = contextMenu.file;
+                      handleInjectDataTrigger();
+                      handleCloseContextMenu();
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-green-400 hover:bg-green-500/20 transition-colors text-left w-full"
+              >
+                  <span>📥 Import Files Here</span>
+              </button>
+              
+              <button 
+                  onClick={() => {
+                      pendingImportTargetRef.current = contextMenu.file;
+                      handleInjectFolderTrigger();
+                      handleCloseContextMenu();
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-green-400 hover:bg-green-500/20 transition-colors text-left w-full"
+              >
+                  <span>📂 Import Folder Here</span>
+              </button>
+
+              <div className="h-px bg-white/10 my-0.5" />
+
+              <button 
+                  onClick={() => {
+                      if (contextMenu.file) handleDeleteFile(contextMenu.file.id);
+                      handleCloseContextMenu();
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors text-left w-full"
+              >
+                  <span>🗑️ Delete Node</span>
+              </button>
+          </div>
+      )}
       
       {/* UI Overlay Layer */}
       <TerminalOverlay

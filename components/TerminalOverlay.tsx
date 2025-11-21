@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle, Cpu, Trash2 } from 'lucide-react';
+import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle, Cpu, Trash2, Minus } from 'lucide-react';
 import { SystemMessage, VirtualFile, FileType, DirectoryState } from '../types';
 import { ROOT_CLARITAS_ID, ROOT_LIBERTAS_ID } from '../constants';
 import { OllamaModel } from '../services/ollamaService';
@@ -53,6 +53,7 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [repoUrl, setRepoUrl] = useState('github.com/ollama/ollama'); // Example default
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Draggable State
   const [position, setPosition] = useState({ x: 20, y: 20 });
@@ -360,35 +361,7 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
       const isText = selectedNode.type === FileType.TEXT || selectedNode.type === FileType.CODE || selectedNode.type === FileType.SYSTEM;
 
       if (isFolder) {
-          return (
-            <>
-                <div className="mb-6">
-                    <div className="text-xs text-green-500 mb-1 tracking-widest uppercase font-mono">Node Controller</div>
-                    <h2 className="text-2xl font-bold text-white break-words">{selectedNode.name}</h2>
-                    <p className="text-gray-400 text-xs mt-2 font-mono border-l-2 border-gray-700 pl-3 py-1">
-                        {selectedNode.content || "Container Node"}
-                    </p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <button 
-                        onClick={onDiveIn}
-                        className="flex flex-col items-center justify-center p-4 bg-green-900/20 border border-green-500/30 rounded-lg hover:bg-green-500/20 hover:border-green-500 transition group"
-                    >
-                        <ZoomIn size={24} className="text-green-400 mb-2 group-hover:scale-110 transition-transform" />
-                        <span className="text-sm font-bold text-green-100">Neural Dive</span>
-                        <span className="text-[10px] text-green-400/70 mt-1">Open Directory</span>
-                    </button>
-                    <button 
-                        onClick={onInjectData}
-                        className="flex flex-col items-center justify-center p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 hover:border-blue-500 transition group"
-                    >
-                        <FilePlus size={24} className="text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
-                        <span className="text-sm font-bold text-blue-100">Inject Here</span>
-                        <span className="text-[10px] text-blue-400/70 mt-1">Add to Node</span>
-                    </button>
-                </div>
-            </>
-          );
+          return null; // Folders are handled by auto-dive in App.tsx
       }
 
       if (isImage) {
@@ -506,7 +479,7 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
             transform: `translate(${position.x}px, ${position.y}px)`,
             touchAction: 'none'
         }}
-        className="pointer-events-auto absolute flex flex-col w-[360px] bg-black/85 backdrop-blur-xl border border-white/10 rounded-lg shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden max-h-[80vh]"
+        className={`pointer-events-auto absolute flex flex-col w-[360px] bg-black/85 backdrop-blur-xl border border-white/10 rounded-lg shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden ${isMinimized ? 'h-auto' : 'max-h-[80vh]'}`}
       >
           {/* Draggable Handle / Header */}
           <div 
@@ -519,80 +492,92 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                         PLINYVERSE
                     </h1>
                </div>
-               <div className="flex items-center space-x-2 text-[10px] text-gray-500 font-mono">
-                   <Activity size={10} className="text-green-500 animate-pulse" />
-                   <span>ONLINE</span>
+               <div className="flex items-center space-x-2">
+                   <div className="flex items-center space-x-2 text-[10px] text-gray-500 font-mono">
+                       <Activity size={10} className="text-green-500 animate-pulse" />
+                       <span>ONLINE</span>
+                   </div>
+                   <button 
+                        onClick={() => setIsMinimized(!isMinimized)}
+                        className="text-gray-500 hover:text-white transition p-1 hover:bg-white/10 rounded"
+                   >
+                       <Minus size={14} />
+                   </button>
                </div>
           </div>
 
-          {/* VDB Stats Row */}
-          <div className="px-4 py-2 border-b border-white/10 bg-black/20 flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-green-400">
-                    <HardDrive size={12} />
-                    <span className="font-bold font-mono text-[10px]">VDB STORAGE</span>
+          {!isMinimized && (
+            <>
+                {/* VDB Stats Row */}
+                <div className="px-4 py-2 border-b border-white/10 bg-black/20 flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-green-400">
+                            <HardDrive size={12} />
+                            <span className="font-bold font-mono text-[10px]">VDB STORAGE</span>
+                        </div>
+                        <div className="flex space-x-3 text-[10px] font-mono text-gray-400">
+                            <span>Nodes: {allFiles.length}</span>
+                            <span>Depth: {directoryStack.length}</span>
+                        </div>
                 </div>
-                <div className="flex space-x-3 text-[10px] font-mono text-gray-400">
-                    <span>Nodes: {allFiles.length}</span>
-                    <span>Depth: {directoryStack.length}</span>
-                </div>
-          </div>
 
-          {/* Breadcrumbs Row */}
-          <div className="px-3 py-2 border-b border-white/10 bg-white/5 flex items-center space-x-1 overflow-x-auto scrollbar-hide">
-                <Database size={12} className="text-gray-500 flex-shrink-0" />
-                {directoryStack.map((dir, idx) => (
-                    <React.Fragment key={`breadcrumb-${idx}-${dir.id}`}>
-                        {idx > 0 && <ChevronRight size={10} className="text-gray-600 flex-shrink-0" />}
-                        <button
-                            onClick={() => onBreadcrumbClick(idx)}
-                            className={`text-[10px] font-mono tracking-wider uppercase whitespace-nowrap transition ${idx === directoryStack.length -1 ? 'text-green-400 font-bold cursor-default' : 'text-gray-400 hover:text-white cursor-pointer'}`}
+                {/* Breadcrumbs Row */}
+                <div className="px-3 py-2 border-b border-white/10 bg-white/5 flex items-center space-x-1 overflow-x-auto scrollbar-hide">
+                        <Database size={12} className="text-gray-500 flex-shrink-0" />
+                        {directoryStack.map((dir, idx) => (
+                            <React.Fragment key={`breadcrumb-${idx}-${dir.id}`}>
+                                {idx > 0 && <ChevronRight size={10} className="text-gray-600 flex-shrink-0" />}
+                                <button
+                                    onClick={() => onBreadcrumbClick(idx)}
+                                    className={`text-[10px] font-mono tracking-wider uppercase whitespace-nowrap transition ${idx === directoryStack.length -1 ? 'text-green-400 font-bold cursor-default' : 'text-gray-400 hover:text-white cursor-pointer'}`}
+                                >
+                                    {dir.name}
+                                </button>
+                            </React.Fragment>
+                        ))}
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-white/10">
+                        <button 
+                            onClick={() => setActiveTab('terminal')}
+                            className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'terminal' ? 'bg-white/10 text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
                         >
-                            {dir.name}
+                            <TerminalIcon size={12} />
                         </button>
-                    </React.Fragment>
-                ))}
-          </div>
+                        <button 
+                            onClick={() => setActiveTab('import')}
+                            className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'import' ? 'bg-white/10 text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
+                        >
+                            <Upload size={12} />
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('sync')}
+                            className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'sync' ? 'bg-white/10 text-blue-400 border-b-2 border-blue-400' : 'text-gray-500'}`}
+                        >
+                            <GitBranch size={12} />
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('claritas')}
+                            className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'claritas' ? 'bg-white/10 text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
+                        >
+                            <Shield size={12} className="mr-1.5" />
+                            CL4R1T4S
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('libertas')}
+                            className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'libertas' ? 'bg-white/10 text-purple-400 border-b-2 border-purple-400' : 'text-gray-500'}`}
+                        >
+                            <Zap size={12} className="mr-1.5" />
+                            L1B3RT4S
+                        </button>
+                </div>
 
-          {/* Tabs */}
-          <div className="flex border-b border-white/10">
-                <button 
-                    onClick={() => setActiveTab('terminal')}
-                    className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'terminal' ? 'bg-white/10 text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
-                >
-                    <TerminalIcon size={12} />
-                </button>
-                 <button 
-                    onClick={() => setActiveTab('import')}
-                    className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'import' ? 'bg-white/10 text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
-                >
-                    <Upload size={12} />
-                </button>
-                <button 
-                    onClick={() => setActiveTab('sync')}
-                    className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'sync' ? 'bg-white/10 text-blue-400 border-b-2 border-blue-400' : 'text-gray-500'}`}
-                >
-                    <GitBranch size={12} />
-                </button>
-                <button
-                    onClick={() => setActiveTab('claritas')}
-                    className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'claritas' ? 'bg-white/10 text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
-                >
-                    <Shield size={12} className="mr-1.5" />
-                    CL4R1T4S
-                </button>
-                <button
-                    onClick={() => setActiveTab('libertas')}
-                    className={`flex-1 p-3 text-[10px] font-mono uppercase tracking-wider hover:bg-white/5 transition flex justify-center items-center ${activeTab === 'libertas' ? 'bg-white/10 text-purple-400 border-b-2 border-purple-400' : 'text-gray-500'}`}
-                >
-                    <Zap size={12} className="mr-1.5" />
-                    L1B3RT4S
-                </button>
-          </div>
-
-          {/* Tab Content Area */}
-          <div className="flex-1 flex flex-col min-h-[250px] max-h-[400px] bg-black/40">
-              {renderTabContent()}
-          </div>
+                {/* Tab Content Area */}
+                <div className="flex-1 flex flex-col min-h-[250px] max-h-[400px] bg-black/40">
+                    {renderTabContent()}
+                </div>
+            </>
+          )}
       </div>
 
       {/* Modal Viewer (Context Aware) */}

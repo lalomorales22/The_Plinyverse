@@ -4,17 +4,22 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server/server.js & vite",
+    "server": "node server/server.js",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.2.0",
-    "lucide-react": "^0.554.0",
-    "three": "^0.181.1",
-    "react": "^19.2.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "lucide-react": "^0.554.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sqlite3": "^5.1.7",
+    "three": "^0.181.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
