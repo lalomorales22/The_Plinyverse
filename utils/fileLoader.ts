@@ -5,7 +5,8 @@ import { ROOT_CLARITAS_ID, ROOT_LIBERTAS_ID } from '../constants';
 const claritasFiles = import.meta.glob('../CL4R1T4S/**/*', { query: '?raw', import: 'default', eager: true });
 const libertasFiles = import.meta.glob('../L1B3RT4S/*', { query: '?raw', import: 'default', eager: true });
 
-const generateId = () => Math.random().toString(36).substring(2, 15);
+// SECURITY FIX: Use crypto.randomUUID() instead of Math.random() for secure ID generation
+const generateId = () => crypto.randomUUID();
 
 // Determine file type based on extension
 const getFileType = (filename: string): FileType => {

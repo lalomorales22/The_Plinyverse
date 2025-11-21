@@ -4,6 +4,7 @@ import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRig
 import { SystemMessage, VirtualFile, FileType, DirectoryState } from '../types';
 import { ROOT_CLARITAS_ID, ROOT_LIBERTAS_ID } from '../constants';
 import { OllamaModel } from '../services/ollamaService';
+import { sanitizeUrl } from '../utils/sanitize';
 
 interface TerminalOverlayProps {
   messages: SystemMessage[];
@@ -396,7 +397,8 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                       </button>
                   </div>
                   <div className="flex-1 bg-black/50 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden p-2">
-                      <img src={selectedNode.content} alt={selectedNode.name} className="max-w-full max-h-[60vh] object-contain rounded" />
+                      {/* SECURITY FIX: Sanitize URL to prevent XSS attacks */}
+                      <img src={sanitizeUrl(selectedNode.content)} alt={selectedNode.name} className="max-w-full max-h-[60vh] object-contain rounded" />
                   </div>
               </div>
           );
@@ -419,7 +421,8 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                     </button>
                 </div>
                 <div className="flex-1 bg-black/50 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden p-2">
-                    <video controls src={selectedNode.content} className="max-w-full max-h-[60vh] rounded" />
+                    {/* SECURITY FIX: Sanitize URL to prevent XSS attacks */}
+                    <video controls src={sanitizeUrl(selectedNode.content)} className="max-w-full max-h-[60vh] rounded" />
                 </div>
             </div>
         );
