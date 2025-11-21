@@ -33,18 +33,18 @@ export const SpriteLabel: React.FC<SpriteLabelProps> = ({
     if (!context) return null;
 
     // Set canvas size based on text length
-    const padding = 16;
-    canvas.width = 256;
-    canvas.height = 64;
+    const padding = 32;
+    canvas.width = 512;
+    canvas.height = 128;
 
     // Draw background
     context.fillStyle = backgroundColor;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw border
-    context.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    context.lineWidth = 2;
-    context.strokeRect(0, 0, canvas.width, canvas.height);
+    // Draw border - REMOVED as per request
+    // context.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    // context.lineWidth = 4;
+    // context.strokeRect(0, 0, canvas.width, canvas.height);
 
     // Draw text
     context.fillStyle = color;
@@ -54,8 +54,8 @@ export const SpriteLabel: React.FC<SpriteLabelProps> = ({
 
     // Truncate text if too long
     let displayText = text;
-    if (text.length > 20) {
-      displayText = text.substring(0, 17) + '...';
+    if (text.length > 25) {
+      displayText = text.substring(0, 22) + '...';
     }
 
     context.fillText(displayText, canvas.width / 2, canvas.height / 2);
@@ -75,7 +75,7 @@ export const SpriteLabel: React.FC<SpriteLabelProps> = ({
   if (!texture) return null;
 
   return (
-    <sprite ref={spriteRef} position={position} scale={[2, 0.5, 1]}>
+    <sprite ref={spriteRef} position={position} scale={[4, 1, 1]}>
       <spriteMaterial map={texture} transparent depthTest={false} />
     </sprite>
   );

@@ -4,6 +4,7 @@ export enum FileType {
   IMAGE = 'IMAGE',
   VIDEO = 'VIDEO',
   PDF = 'PDF',
+  HTML = 'HTML',
   CODE = 'CODE',
   SYSTEM = 'SYSTEM',
   DATA_NODE = 'DATA_NODE',

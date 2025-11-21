@@ -14,6 +14,7 @@ const App: React.FC = () => {
   // --- Persistent File System State ---
   // Initialize with Root Directories + Dynamically Loaded Project Files
 const [allFiles, setAllFiles] = useState<VirtualFile[]>([]);
+const [isLoading, setIsLoading] = useState(true);
 
 // NEW: Cluster Management
 const [allClusters, setAllClusters] = useState<Cluster[]>([]);
@@ -22,6 +23,7 @@ const [currentClusterId, setCurrentClusterId] = useState<string>('root');
 // Load files and clusters from DB on mount
 useEffect(() => {
     const initData = async () => {
+        setIsLoading(true);
         // Load clusters first
         const dbClusters = await dbService.getAllClusters();
         setAllClusters(dbClusters);
@@ -29,25 +31,47 @@ useEffect(() => {
         // Load files
         const dbFiles = await dbService.getAllFiles();
 
-        if (dbFiles.length === 0) {
-            // First run: Load initial files and save to DB
-            const rootDirs = ROOT_DIRECTORIES.map(f => ({
+        // Check for missing root directories (CL4R1T4S, L1B3RT4S)
+        const missingRootDirs = ROOT_DIRECTORIES.filter(rd => !dbFiles.some(df => df.id === rd.id));
+        
+        if (missingRootDirs.length > 0 || dbFiles.length === 0) {
+            console.log(">> RESTORING MISSING SYSTEM FILES...");
+            
+            // 1. Prepare Root Directories
+            const rootDirsToSave = missingRootDirs.map(f => ({
                 ...f,
                 type: f.type as FileType,
                 parentId: f.parentId || 'root',
-                clusterId: 'root' // Assign to root cluster
+                clusterId: 'root'
             }));
+
+            // 2. Prepare Project Files (only if roots were missing, to avoid duplicates)
+            // We filter out files that already exist by (name + parentId) to be safe
             const projectFiles = loadInitialProjectFiles().map(f => ({
                 ...f,
                 clusterId: 'root'
             }));
-            const initialFiles = [...rootDirs, ...projectFiles];
 
-            await dbService.saveFilesBatch(initialFiles);
-            setAllFiles(initialFiles);
+            const newProjectFiles = projectFiles.filter(pf => 
+                !dbFiles.some(df => df.name === pf.name && df.parentId === pf.parentId)
+            );
+
+            const filesToSave = [...rootDirsToSave, ...newProjectFiles];
+
+            if (filesToSave.length > 0) {
+                await dbService.saveFilesBatch(filesToSave);
+                setAllFiles([...dbFiles, ...filesToSave]);
+            } else {
+                setAllFiles(dbFiles);
+            }
         } else {
             setAllFiles(dbFiles);
         }
+        
+        // Force loading screen to stay for at least 5 seconds
+        setTimeout(() => {
+            setIsLoading(false);
+        }, 5000);
     };
     initData();
 }, []);
@@ -410,7 +434,7 @@ const handleSyncRepo = async (url: string) => {
             else if (name.endsWith('.md')) type = FileType.TEXT;
             else if (name.endsWith('.json')) type = FileType.CODE;
             else if (name.endsWith('.css') || name.endsWith('.scss')) type = FileType.CODE;
-            else if (name.endsWith('.html')) type = FileType.CODE;
+            else if (name.endsWith('.html')) type = FileType.HTML;
             
             let content = "";
             try {
@@ -613,6 +637,22 @@ const handleClusterClick = useCallback((clusterId: string) => {
     }
 }, [allClusters]);
 
+const handleClusterMove = useCallback(async (clusterId: string, newPosition: [number, number, number]) => {
+    // Update local state
+    setAllClusters(prev => prev.map(c => 
+        c.id === clusterId ? { ...c, position: newPosition } : c
+    ));
+
+    // Persist to DB
+    const cluster = allClusters.find(c => c.id === clusterId);
+    if (cluster) {
+        await dbService.saveCluster({ ...cluster, position: newPosition });
+    }
+}, [allClusters]);
+
+
+// --- Drag & Drop / File Processing ---
+
 
 // --- Drag & Drop / File Processing ---
 
@@ -623,13 +663,27 @@ const readFileContent = (file: File): Promise<{content: string, type: FileType}>
         reader.onload = (event) => {
             const content = (event.target?.result as string) || "";
             let fileType = FileType.TEXT;
-            if (file.type.startsWith('image/')) fileType = FileType.IMAGE;
-            else if (file.type.startsWith('video/')) fileType = FileType.VIDEO;
-            else if (file.type === 'application/pdf') fileType = FileType.PDF;
+            
+            // Robust type detection using MIME type AND extension
+            const mime = file.type.toLowerCase();
+            const name = file.name.toLowerCase();
+
+            if (mime.startsWith('image/') || name.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) fileType = FileType.IMAGE;
+            else if (mime.startsWith('video/') || name.match(/\.(mp4|webm|ogg|mov)$/)) fileType = FileType.VIDEO;
+            else if (mime === 'application/pdf' || name.endsWith('.pdf')) fileType = FileType.PDF;
+            else if (mime === 'text/html' || name.endsWith('.html') || name.endsWith('.htm')) fileType = FileType.HTML;
+            else if (name.endsWith('.ts') || name.endsWith('.tsx') || name.endsWith('.js') || name.endsWith('.jsx') || name.endsWith('.json') || name.endsWith('.css')) fileType = FileType.CODE;
+            
             resolve({ content, type: fileType });
         };
         
-        if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type === 'application/pdf') {
+        // Determine read method based on type/extension
+        const mime = file.type.toLowerCase();
+        const name = file.name.toLowerCase();
+        const isBinary = mime.startsWith('image/') || mime.startsWith('video/') || mime === 'application/pdf' || 
+                         name.match(/\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|ogg|mov|pdf)$/);
+
+        if (isBinary) {
             reader.readAsDataURL(file);
         } else {
             reader.readAsText(file);
@@ -823,6 +877,32 @@ e.preventDefault();
 e.stopPropagation();
 };
 
+if (isLoading) {
+    return (
+        <div className="w-screen h-screen bg-black flex flex-col items-center justify-center z-50">
+            <div className="relative w-24 h-24 mb-8">
+                <div className="absolute inset-0 border-4 border-green-500/30 rounded-full animate-ping"></div>
+                <div className="absolute inset-0 border-4 border-t-green-500 rounded-full animate-spin"></div>
+            </div>
+            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-500 tracking-[0.5em] animate-pulse">
+                THE_PLINYVERSE
+            </h1>
+            <div className="mt-4 text-green-500/50 font-mono text-sm">
+                INITIALIZING VIRTUAL DATABASE (VDB)...
+            </div>
+            
+            <div className="mt-12 bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg px-6 py-4 max-w-md text-center">
+                <div className="text-xs text-gray-400 font-mono space-y-2">
+                    <p><span className="text-green-400 font-bold">WASD</span> to navigate 3D space</p>
+                    <p>Click any <span className="text-blue-400">Cluster Sphere</span> to switch context</p>
+                    <p>Hold <span className="text-yellow-400 font-bold">ALT</span> to move clusters</p>
+                    <p>Click nodes to inspect or dive deeper</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 return (
 <div 
     className="relative w-screen h-screen overflow-hidden bg-black"
@@ -853,6 +933,7 @@ return (
     files={allFiles}
     currentDirectoryId={currentDirectory.id}
     onClusterClick={handleClusterClick}
+    onClusterMove={handleClusterMove}
     onNodeClick={handleNodeClick}
     onNodeContextMenu={handleNodeContextMenu}
     divingNodeId={divingNodeId}

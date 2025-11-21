@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle, Cpu, Trash2, Minus } from 'lucide-react';
+import { Send, HardDrive, Activity, Layers, Terminal as TerminalIcon, ChevronRight, Database, ZoomIn, Upload, X, FilePlus, Video as VideoIcon, Image as ImageIcon, FileText, GripHorizontal, Shield, Zap, FolderPlus, GitBranch, Cloud, RefreshCw, CheckCircle, Cpu, Trash2, Minus, Copy, Download } from 'lucide-react';
 import { SystemMessage, VirtualFile, FileType, DirectoryState } from '../types';
 import { ROOT_CLARITAS_ID, ROOT_LIBERTAS_ID } from '../constants';
 import { OllamaModel } from '../services/ollamaService';
@@ -113,6 +113,39 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
       setNewClusterName('');
       setShowClusterModal(false);
   }
+
+  const handleCopyContent = () => {
+      if (!selectedNode) return;
+      navigator.clipboard.writeText(selectedNode.content)
+          .then(() => alert('Content copied to clipboard!'))
+          .catch(err => console.error('Failed to copy:', err));
+  };
+
+  const handleDownloadFile = () => {
+      if (!selectedNode) return;
+      
+      const element = document.createElement("a");
+      let fileContent = selectedNode.content;
+      let mimeType = "text/plain";
+
+      // Handle different file types
+      if (selectedNode.type === FileType.IMAGE || selectedNode.type === FileType.VIDEO || selectedNode.type === FileType.PDF) {
+          // For binary files stored as Data URLs, we can use them directly
+          element.href = selectedNode.content;
+      } else {
+          // For text files, create a blob
+          if (selectedNode.type === FileType.HTML) mimeType = "text/html";
+          else if (selectedNode.type === FileType.CODE) mimeType = "application/javascript"; // Generic code
+          
+          const file = new Blob([selectedNode.content], {type: mimeType});
+          element.href = URL.createObjectURL(file);
+      }
+
+      element.download = selectedNode.name;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+  };
 
   // Drag Logic
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -374,6 +407,7 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
       const isImage = selectedNode.type === FileType.IMAGE;
       const isVideo = selectedNode.type === FileType.VIDEO;
       const isPdf = selectedNode.type === FileType.PDF;
+      const isHtml = selectedNode.type === FileType.HTML;
       const isText = selectedNode.type === FileType.TEXT || selectedNode.type === FileType.CODE || selectedNode.type === FileType.SYSTEM;
 
       if (isFolder) {
@@ -388,13 +422,23 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                           <ImageIcon size={18} />
                           {selectedNode.name}
                       </h2>
-                      <button
-                          onClick={handleDeleteFile}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
-                      >
-                          <Trash2 size={14} />
-                          Delete
-                      </button>
+                      <div className="flex items-center gap-2">
+                          <button
+                              onClick={handleDownloadFile}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-blue-900/20 border border-blue-500/30 rounded hover:bg-blue-500/20 hover:border-blue-500 transition text-blue-400 text-sm"
+                              title="Download File"
+                          >
+                              <Download size={14} />
+                              Export
+                          </button>
+                          <button
+                              onClick={handleDeleteFile}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm mr-12"
+                          >
+                              <Trash2 size={14} />
+                              Delete
+                          </button>
+                      </div>
                   </div>
                   <div className="flex-1 bg-black/50 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden p-2">
                       {/* SECURITY FIX: Sanitize URL to prevent XSS attacks */}
@@ -412,13 +456,23 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                         <VideoIcon size={18} />
                         {selectedNode.name}
                     </h2>
-                    <button
-                        onClick={handleDeleteFile}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
-                    >
-                        <Trash2 size={14} />
-                        Delete
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleDownloadFile}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-900/20 border border-blue-500/30 rounded hover:bg-blue-500/20 hover:border-blue-500 transition text-blue-400 text-sm"
+                            title="Download File"
+                        >
+                            <Download size={14} />
+                            Export
+                        </button>
+                        <button
+                            onClick={handleDeleteFile}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm mr-12"
+                        >
+                            <Trash2 size={14} />
+                            Delete
+                        </button>
+                    </div>
                 </div>
                 <div className="flex-1 bg-black/50 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden p-2">
                     {/* SECURITY FIX: Sanitize URL to prevent XSS attacks */}
@@ -436,16 +490,79 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                         <FileText size={18} />
                         {selectedNode.name}
                     </h2>
-                    <button
-                        onClick={handleDeleteFile}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
-                    >
-                        <Trash2 size={14} />
-                        Delete
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleDownloadFile}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-900/20 border border-blue-500/30 rounded hover:bg-blue-500/20 hover:border-blue-500 transition text-blue-400 text-sm"
+                            title="Download File"
+                        >
+                            <Download size={14} />
+                            Export
+                        </button>
+                        <button
+                            onClick={handleDeleteFile}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm mr-12"
+                        >
+                            <Trash2 size={14} />
+                            Delete
+                        </button>
+                    </div>
                 </div>
                 <div className="flex-1 bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-                    <iframe src={selectedNode.content} className="w-full h-[60vh]" title="PDF Viewer"></iframe>
+                    <embed src={selectedNode.content} type="application/pdf" className="w-full h-full" />
+                </div>
+            </div>
+        )
+      }
+
+      if (isHtml) {
+        // Inject custom scrollbar styles into the HTML content
+        const themedHtmlContent = `
+            <style>
+                ::-webkit-scrollbar { width: 8px; height: 8px; }
+                ::-webkit-scrollbar-track { background: #000; }
+                ::-webkit-scrollbar-thumb { background: #22c55e; border-radius: 4px; }
+                ::-webkit-scrollbar-thumb:hover { background: #16a34a; }
+                body { background-color: #000; color: #eee; font-family: monospace; }
+            </style>
+            ${selectedNode.content}
+        `;
+
+        return (
+             <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-orange-400 flex items-center gap-2">
+                        <FileText size={18} />
+                        {selectedNode.name}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleCopyContent}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-green-900/20 border border-green-500/30 rounded hover:bg-green-500/20 hover:border-green-500 transition text-green-400 text-sm"
+                            title="Copy HTML Code"
+                        >
+                            <Copy size={14} />
+                            Copy
+                        </button>
+                        <button
+                            onClick={handleDownloadFile}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-900/20 border border-blue-500/30 rounded hover:bg-blue-500/20 hover:border-blue-500 transition text-blue-400 text-sm"
+                            title="Download File"
+                        >
+                            <Download size={14} />
+                            Export
+                        </button>
+                        <button
+                            onClick={handleDeleteFile}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm mr-12"
+                        >
+                            <Trash2 size={14} />
+                            Delete
+                        </button>
+                    </div>
+                </div>
+                <div className="flex-1 bg-white border border-white/10 rounded-lg overflow-hidden">
+                    <iframe srcDoc={themedHtmlContent} className="w-full h-full" title="HTML Viewer" sandbox="allow-scripts allow-same-origin"></iframe>
                 </div>
             </div>
         )
@@ -462,24 +579,42 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
                           </h2>
                           <div className="text-xs text-gray-500 font-mono">{selectedNode.content.length} chars</div>
                       </div>
-                      <button
-                          onClick={handleDeleteFile}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm"
-                      >
-                          <Trash2 size={14} />
-                          Delete
-                      </button>
+                      <div className="flex items-center gap-2">
+                          <button
+                              onClick={handleCopyContent}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-green-900/20 border border-green-500/30 rounded hover:bg-green-500/20 hover:border-green-500 transition text-green-400 text-sm"
+                              title="Copy Content"
+                          >
+                              <Copy size={14} />
+                              Copy
+                          </button>
+                          <button
+                              onClick={handleDownloadFile}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-blue-900/20 border border-blue-500/30 rounded hover:bg-blue-500/20 hover:border-blue-500 transition text-blue-400 text-sm"
+                              title="Download File"
+                          >
+                              <Download size={14} />
+                              Export
+                          </button>
+                          <button
+                              onClick={handleDeleteFile}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-500/30 rounded hover:bg-red-500/20 hover:border-red-500 transition text-red-400 text-sm mr-12"
+                          >
+                              <Trash2 size={14} />
+                              Delete
+                          </button>
+                      </div>
                   </div>
                   <div className="flex-1 bg-gray-900/80 border border-white/10 rounded-lg overflow-hidden flex flex-col">
                        <div className="bg-white/5 px-3 py-1 border-b border-white/5 text-[10px] text-gray-400 font-mono flex gap-4">
                            <span>UTF-8</span>
                            <span>READ-ONLY</span>
                        </div>
-                       <textarea
-                          readOnly
-                          value={selectedNode.content}
-                          className="w-full h-[50vh] bg-transparent text-green-50 font-mono text-xs p-4 outline-none resize-none"
-                       />
+                       <div className="flex-1 overflow-y-auto p-4">
+                           <pre className="text-green-50 font-mono text-xs whitespace-pre-wrap break-words">
+                               {selectedNode.content}
+                           </pre>
+                       </div>
                   </div>
               </div>
           );
@@ -527,24 +662,24 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
           {!isMinimized && (
             <>
                 {/* VDB Stats Row */}
-                <div className="px-4 py-3 border-b border-white/10 bg-black/20 flex items-center justify-between gap-4">
-                    <div className="flex items-center space-x-3 text-green-400">
+                <div className="px-3 py-3 border-b border-white/10 bg-black/20 flex items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2 text-green-400">
                         <HardDrive size={12} />
-                        <span className="font-bold font-mono text-[10px]">VDB STORAGE</span>
+                        <span className="font-bold font-mono text-[10px]">VDB</span>
                     </div>
-                    <div className="flex items-center space-x-6 text-[10px] font-mono text-gray-400 flex-1 justify-center">
-                        <span>Clusters: {clusterCount}</span>
-                        <span>Nodes: {allFiles.length}</span>
-                        <span>Depth: {directoryStack.length}</span>
+                    <div className="flex items-center space-x-1.5 text-[10px] font-mono text-gray-400 flex-1 justify-center">
+                        <span>C:{clusterCount}</span>
+                        <span>N:{allFiles.length}</span>
+                        <span>D:{directoryStack.length}</span>
                     </div>
                     {/* + NODE button moved to far right */}
                     <button
                         onClick={() => setShowClusterModal(true)}
-                        className="px-3 py-1 bg-green-600/20 hover:bg-green-600/40 border border-green-500/50 rounded text-[10px] font-mono transition flex items-center gap-1.5 whitespace-nowrap"
+                        className="px-2 py-1 bg-green-600/20 hover:bg-green-600/40 border border-green-500/50 rounded text-[10px] font-mono transition flex items-center gap-1 whitespace-nowrap"
                         title="Create new cluster"
                     >
                         <Layers size={10} />
-                        + NODE
+                        +NODE
                     </button>
                 </div>
 

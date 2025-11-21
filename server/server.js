@@ -33,7 +33,7 @@ app.use(cors({
 }));
 
 // SECURITY FIX: Reduced body size limit from 50mb to 10mb to prevent DoS
-app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.json({ limit: '100mb' }));
 
 // SECURITY FIX: Add rate limiting to prevent abuse
 const limiter = rateLimit({
@@ -72,14 +72,14 @@ const validateFileInput = (req, res, next) => {
   }
 
   // Validate type
-  const validTypes = ['file', 'folder', 'image', 'video', 'audio', 'document'];
+  const validTypes = ['TEXT', 'IMAGE', 'VIDEO', 'PDF', 'HTML', 'CODE', 'SYSTEM', 'DATA_NODE', 'DIRECTORY'];
   if (!validTypes.includes(type)) {
     return res.status(400).json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` });
   }
 
   // Validate content length (if present)
-  if (content && content.length > 10 * 1024 * 1024) { // 10MB
-    return res.status(400).json({ error: 'Content too large. Maximum 10MB.' });
+  if (content && content.length > 100 * 1024 * 1024) { // 100MB
+    return res.status(400).json({ error: 'Content too large. Maximum 100MB.' });
   }
 
   next();
@@ -178,7 +178,7 @@ app.post('/api/files/batch', (req, res) => {
 
     // SECURITY FIX: Validate each file in the batch
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const validTypes = ['file', 'folder', 'image', 'video', 'audio', 'document'];
+    const validTypes = ['TEXT', 'IMAGE', 'VIDEO', 'PDF', 'HTML', 'CODE', 'SYSTEM', 'DATA_NODE', 'DIRECTORY'];
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -259,7 +259,7 @@ app.get('/api/clusters', (req, res) => {
 // Create a new cluster with validation
 app.post('/api/clusters', validateClusterInput, (req, res) => {
   const { id, name, position, color, createdAt } = req.body;
-  const sql = `INSERT INTO clusters (id, name, positionX, positionY, positionZ, color, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  const sql = `INSERT OR REPLACE INTO clusters (id, name, positionX, positionY, positionZ, color, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`;
   const params = [id, name, position[0], position[1], position[2], color, createdAt];
 
   db.run(sql, params, function (err) {
