@@ -19,6 +19,7 @@ interface MultiClusterVisualizerProps {
   clusters: Cluster[];
   currentClusterId: string;
   files: VirtualFile[];
+  currentDirectoryId: string; // NEW: Filter files by parent directory
   onClusterClick: (clusterId: string) => void;
   onNodeClick: (file: VirtualFile) => void;
   onNodeContextMenu: (file: VirtualFile, event: any) => void;
@@ -88,6 +89,7 @@ const calculateNodePosition = (index: number, total: number, radius: number = 4.
 interface ClusterSphereProps {
     cluster: Cluster;
     files: VirtualFile[];
+    currentDirectoryId: string; // NEW: Filter by current directory
     isActive: boolean;
     onClick: () => void;
     onNodeClick: (file: VirtualFile) => void;
@@ -98,6 +100,7 @@ interface ClusterSphereProps {
 const ClusterSphere: React.FC<ClusterSphereProps> = ({
     cluster,
     files,
+    currentDirectoryId,
     isActive,
     onClick,
     onNodeClick,
@@ -109,8 +112,11 @@ const ClusterSphere: React.FC<ClusterSphereProps> = ({
     const [particleCount, setParticleCount] = useState(isActive ? 400 : 200);
     const { camera } = useThree();
 
-    // Only show files for this cluster
-    const clusterFiles = files.filter(f => (f.clusterId || 'root') === cluster.id);
+    // Only show files for this cluster AND current directory level
+    const clusterFiles = files.filter(f =>
+        (f.clusterId || 'root') === cluster.id &&
+        f.parentId === currentDirectoryId
+    );
 
     // PERFORMANCE FIX: LOD system - Adjust particle count based on camera distance and active state
     useFrame(() => {
@@ -289,6 +295,28 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
 
     return (
         <group>
+            {/* Outer glow ring - always visible */}
+            <mesh scale={[1.6, 1.6, 1.6]}>
+                <sphereGeometry args={[0.25, 16, 16]} />
+                <meshBasicMaterial
+                    color={color}
+                    transparent
+                    opacity={0.15}
+                    depthWrite={false}
+                />
+            </mesh>
+
+            {/* Middle highlight ring */}
+            <mesh scale={[1.4, 1.4, 1.4]}>
+                <sphereGeometry args={[0.25, 16, 16]} />
+                <meshBasicMaterial
+                    color={color}
+                    transparent
+                    opacity={hovered ? 0.35 : 0.25}
+                    depthWrite={false}
+                />
+            </mesh>
+
             <mesh
                 ref={meshRef}
                 position={[0,0,0]}
@@ -301,14 +329,14 @@ const DataNode: React.FC<DataNodeProps> = ({ file, index, total, onClick, onCont
                 <meshStandardMaterial
                     color={color}
                     emissive={color}
-                    emissiveIntensity={hovered ? 2.5 : 0.8}
+                    emissiveIntensity={hovered ? 2.5 : 1.2}
                     roughness={0.1}
                     metalness={0.6}
                 />
 
-                <mesh ref={haloRef} scale={[1.4, 1.4, 1.4]}>
+                <mesh ref={haloRef} scale={[1.2, 1.2, 1.2]}>
                     <sphereGeometry args={[0.25, 16, 16]} />
-                    <meshBasicMaterial color={color} transparent opacity={hovered ? 0.2 : 0.1} depthWrite={false} />
+                    <meshBasicMaterial color={color} transparent opacity={hovered ? 0.3 : 0.2} depthWrite={false} />
                 </mesh>
 
                 {/* PERFORMANCE FIX: Using canvas-based sprite label instead of HTML overlay */}
@@ -360,12 +388,14 @@ const DiveController = ({
     files,
     onDiveComplete,
     currentClusterId,
+    currentDirectoryId,
     clusters
 }: {
     divingNodeId: string | null,
     files: VirtualFile[],
     onDiveComplete: () => void,
     currentClusterId: string,
+    currentDirectoryId: string,
     clusters: Cluster[]
 }) => {
     const { camera, controls } = useThree();
@@ -377,7 +407,11 @@ const DiveController = ({
 
     useFrame(() => {
         if (divingNodeId) {
-            const clusterFiles = files.filter(f => (f.clusterId || 'root') === currentClusterId);
+            // Filter by both cluster and current directory level
+            const clusterFiles = files.filter(f =>
+                (f.clusterId || 'root') === currentClusterId &&
+                f.parentId === currentDirectoryId
+            );
             const targetIndex = clusterFiles.findIndex(f => f.id === divingNodeId);
 
             if (targetIndex !== -1) {
@@ -471,6 +505,7 @@ const MultiClusterVisualizer: React.FC<MultiClusterVisualizerProps> = ({
     clusters,
     currentClusterId,
     files,
+    currentDirectoryId,
     onClusterClick,
     onNodeClick,
     onNodeContextMenu,
@@ -504,6 +539,7 @@ const MultiClusterVisualizer: React.FC<MultiClusterVisualizerProps> = ({
                     files={files}
                     onDiveComplete={onDiveComplete}
                     currentClusterId={currentClusterId}
+                    currentDirectoryId={currentDirectoryId}
                     clusters={clusters}
                 />
 
@@ -518,6 +554,7 @@ const MultiClusterVisualizer: React.FC<MultiClusterVisualizerProps> = ({
                         key={cluster.id}
                         cluster={cluster}
                         files={files}
+                        currentDirectoryId={currentDirectoryId}
                         isActive={cluster.id === currentClusterId}
                         onClick={() => onClusterClick(cluster.id)}
                         onNodeClick={onNodeClick}
@@ -529,7 +566,7 @@ const MultiClusterVisualizer: React.FC<MultiClusterVisualizerProps> = ({
                 <OrbitControls
                     makeDefault
                     enabled={!divingNodeId}
-                    enablePan={false}
+                    enablePan={true}
                     enableZoom={true}
                     minDistance={0.5}
                     maxDistance={100}

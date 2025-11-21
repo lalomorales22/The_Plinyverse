@@ -527,25 +527,25 @@ const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
           {!isMinimized && (
             <>
                 {/* VDB Stats Row */}
-                <div className="px-4 py-2 border-b border-white/10 bg-black/20 flex items-center justify-between">
+                <div className="px-4 py-3 border-b border-white/10 bg-black/20 flex items-center justify-between gap-4">
                     <div className="flex items-center space-x-3 text-green-400">
-                            <HardDrive size={12} />
-                            <span className="font-bold font-mono text-[10px]">VDB STORAGE</span>
-                            {/* NEW: + NODE button for creating clusters */}
-                            <button
-                                onClick={() => setShowClusterModal(true)}
-                                className="ml-2 px-2 py-0.5 bg-green-600/20 hover:bg-green-600/40 border border-green-500/50 rounded text-[10px] font-mono transition flex items-center gap-1"
-                                title="Create new cluster"
-                            >
-                                <Layers size={10} />
-                                + NODE
-                            </button>
-                        </div>
-                        <div className="flex space-x-3 text-[10px] font-mono text-gray-400">
-                            <span>Clusters: {clusterCount}</span>
-                            <span>Nodes: {allFiles.length}</span>
-                            <span>Depth: {directoryStack.length}</span>
-                        </div>
+                        <HardDrive size={12} />
+                        <span className="font-bold font-mono text-[10px]">VDB STORAGE</span>
+                    </div>
+                    <div className="flex items-center space-x-6 text-[10px] font-mono text-gray-400 flex-1 justify-center">
+                        <span>Clusters: {clusterCount}</span>
+                        <span>Nodes: {allFiles.length}</span>
+                        <span>Depth: {directoryStack.length}</span>
+                    </div>
+                    {/* + NODE button moved to far right */}
+                    <button
+                        onClick={() => setShowClusterModal(true)}
+                        className="px-3 py-1 bg-green-600/20 hover:bg-green-600/40 border border-green-500/50 rounded text-[10px] font-mono transition flex items-center gap-1.5 whitespace-nowrap"
+                        title="Create new cluster"
+                    >
+                        <Layers size={10} />
+                        + NODE
+                    </button>
                 </div>
 
                 {/* Breadcrumbs Row */}

@@ -851,6 +851,7 @@ const App: React.FC = () => {
         clusters={allClusters}
         currentClusterId={currentClusterId}
         files={allFiles}
+        currentDirectoryId={currentDirectory.id}
         onClusterClick={handleClusterClick}
         onNodeClick={handleNodeClick}
         onNodeContextMenu={handleNodeContextMenu}
